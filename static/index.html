@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RiskGuard — Аналитическая платформа</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <!-- Chart.js 4.4.0 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      /* Дополнительный стиль для индикатора загрузки */
+      #globalLoader {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(4px);
+      }
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #4f46e5;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body class="antialiased text-slate-800">
+    <!-- Глобальный лоадер -->
+    <div id="globalLoader" class="fixed inset-0 z-[100] hidden flex items-center justify-center">
+       <div class="spinner"></div>
+    </div>
+
+    <div class="flex h-screen overflow-hidden">
+      <!-- SIDEBAR -->
+      <aside class="w-72 bg-white flex-shrink-0 border-r border-slate-200 z-20 flex flex-col">
+        <div class="p-6">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+              <i class="fas fa-shield-alt text-lg"></i>
+            </div>
+            <div>
+              <span class="font-bold text-xl tracking-tight">RiskGuard</span>
+              <p class="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">Security Analytics</p>
+            </div>
+          </div>
+        </div>
+
+        <nav class="flex-1 px-4 space-y-1 mt-4">
+          <div class="sidebar-item flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-slate-600 active" data-tab="dashboard">
+            <i class="fas fa-chart-pie w-5"></i><span>Дашборд</span>
+          </div>
+          <div class="sidebar-item flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-slate-600" data-tab="passengers">
+            <i class="fas fa-users w-5"></i><span>Пассажиры</span>
+          </div>
+          <div class="sidebar-item flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-slate-600" data-tab="operations">
+            <i class="fas fa-exchange-alt w-5"></i><span>Операции</span>
+          </div>
+          <div class="sidebar-item flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-slate-600" data-tab="riskmap">
+            <i class="fas fa-map-marked-alt w-5"></i><span>Концентрация</span>
+          </div>
+          <div class="sidebar-item hidden" data-tab="profile">
+             <!-- Скрытый таб для карточки -->
+          </div>
+          <div class="pt-4 pb-2 px-4 shadow-none">
+             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Инструменты</p>
+          </div>
+          <div class="sidebar-item flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-slate-600" data-tab="upload">
+            <i class="fas fa-cloud-upload-alt w-5"></i><span>Загрузка данных</span>
+          </div>
+          <div class="sidebar-item flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-slate-600" data-tab="reports">
+            <i class="fas fa-file-export w-5"></i><span>Экспорт отчетов</span>
+          </div>
+        </nav>
+
+        <div class="p-6 border-t border-slate-100">
+          <div class="bg-slate-50 rounded-2xl p-4">
+            <div class="flex items-center space-x-3 mb-3">
+              <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">AD</div>
+              <div class="overflow-hidden">
+                <p class="text-xs font-bold truncate">Administrator</p>
+                <p class="text-[10px] text-slate-500">Системный аналитик</p>
+              </div>
+            </div>
+            <button onclick="Auth.logout()" class="w-full py-2 text-xs font-semibold text-slate-600 hover:text-red-600 transition-colors flex items-center justify-center space-x-2">
+              <i class="fas fa-sign-out-alt"></i><span>Выйти из системы</span>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- MAIN CONTENT -->
+      <main class="flex-1 overflow-y-auto bg-slate-50 relative">
+        <div class="p-8 max-w-7xl mx-auto">
+          <!-- HEADER -->
+          <div class="flex justify-between items-center mb-10">
+            <div>
+              <h1 class="text-3xl font-extrabold text-slate-900" id="pageTitle">Дашборд аналитики</h1>
+              <p class="text-slate-500 mt-1">Добро пожаловать в систему мониторинга рисков</p>
+            </div>
+            <div class="flex items-center space-x-3">
+              <div class="bg-white border border-slate-200 px-4 py-2 rounded-xl shadow-sm text-sm font-medium flex items-center">
+                <i class="far fa-calendar-alt mr-2 text-slate-400"></i>
+                <span id="currentDateDisplay">Апрель 2026</span>
+              </div>
+              <button onclick="renderDashboard()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-100 text-sm font-semibold transition-all">
+                <i class="fas fa-sync-alt mr-2"></i>Обновить данные
+              </button>
+            </div>
+          </div>
+
+          <!-- TAB: DASHBOARD -->
+          <div id="dashboard" class="tab-content active-tab">
+            <!-- KPI Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-10">
+              <div class="card-premium p-6">
+                <p class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Всего пассажиров</p>
+                <div class="flex items-end justify-between">
+                  <span class="text-2xl font-bold stat-value" id="kpi-total-passengers">0</span>
+                  <span class="text-[10px] font-bold text-slate-400">Total</span>
+                </div>
+              </div>
+              <div class="card-premium p-6">
+                <p class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">High Risk</p>
+                <div class="flex items-end justify-between">
+                  <span class="text-2xl font-bold stat-value text-orange-600" id="kpi-high-risk">0</span>
+                  <span class="trend-up" id="trend-high-risk"></span>
+                </div>
+              </div>
+              <div class="card-premium p-6 border-l-4 border-l-red-500">
+                <p class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Critical Risk</p>
+                <span class="text-2xl font-bold stat-value text-red-600 block" id="kpi-critical-risk">0</span>
+                <span class="text-[10px] text-red-400 font-medium font-bold block mt-1">ТРЕБУЮТ ПРОВЕРКИ</span>
+              </div>
+              <div class="card-premium p-6">
+                <p class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Доля рисков</p>
+                <div class="flex items-end justify-between">
+                  <span class="text-2xl font-bold stat-value" id="kpi-share-suspicious">0%</span>
+                  <span class="trend-down" id="trend-share-suspicious"></span>
+                </div>
+              </div>
+              <div class="card-premium p-6">
+                <p class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Топ канал</p>
+                <p class="text-sm font-bold truncate mt-1 text-slate-700 font-bold" id="kpi-top-channel">-</p>
+                <span class="text-[10px] text-slate-400 font-medium" id="trend-top-channel">макс. нагрузка</span>
+              </div>
+              <div class="card-premium p-6">
+                <p class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Топ терминал</p>
+                <p class="text-sm font-bold truncate mt-1 text-slate-700 font-bold" id="kpi-top-terminal">-</p>
+                <span class="text-[10px] text-slate-400 font-medium" id="trend-top-terminal">lift factor</span>
+              </div>
+            </div>
+
+            <!-- Charts Row 1 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+              <div class="card-premium p-6">
+                <div class="flex items-center justify-between mb-6">
+                  <h3 class="font-bold text-slate-800 flex items-center">
+                    <span class="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center mr-3"><i class="fas fa-chart-line"></i></span>
+                    Динамика риска по дням
+                  </h3>
+                </div>
+                <div class="chart-container">
+                  <canvas id="riskTrendChart"></canvas>
+                </div>
+              </div>
+              <div class="card-premium p-6">
+                <div class="flex items-center justify-between mb-6">
+                  <h3 class="font-bold text-slate-800 flex items-center">
+                    <span class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center mr-3"><i class="fas fa-chart-bar"></i></span>
+                    Риск по каналам продаж
+                  </h3>
+                </div>
+                <div class="chart-container">
+                  <canvas id="riskChannelChart"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <!-- Charts Row 2 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div class="card-premium p-6">
+                <div class="flex items-center justify-between mb-6">
+                  <h3 class="font-bold text-slate-800 flex items-center">
+                    <span class="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center mr-3"><i class="fas fa-building"></i></span>
+                    Risk Lift по терминалам (топ-5)
+                  </h3>
+                </div>
+                <div class="chart-container">
+                  <canvas id="liftTerminalChart"></canvas>
+                </div>
+              </div>
+              <div class="card-premium p-6">
+                <div class="flex items-center justify-between mb-6">
+                  <h3 class="font-bold text-slate-800 flex items-center">
+                    <span class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center mr-3"><i class="fas fa-chair"></i></span>
+                    Seat-blocking кейсы (тренд)
+                  </h3>
+                </div>
+                <div class="chart-container">
+                  <canvas id="seatBlockingTrend"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: PASSENGERS -->
+          <div id="passengers" class="tab-content">
+            <div class="card-premium p-6">
+              <div class="flex flex-wrap gap-4 justify-between items-center mb-8">
+                <h2 class="text-xl font-bold flex items-center">
+                  <i class="fas fa-user-shield mr-3 text-indigo-600"></i>Список подозрительных пассажиров
+                </h2>
+                <div class="flex gap-3">
+                  <select id="riskFilter" class="bg-slate-50 border-0 rounded-xl px-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-indigo-200 outline-none">
+                    <option value="all">Все риски</option>
+                    <option value="High">High Risk</option>
+                    <option value="Critical">Critical Risk</option>
+                  </select>
+                  <div class="relative">
+                    <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" id="passengerSearchInput" placeholder="Поиск по ФИО или ID..." class="bg-slate-50 border-0 rounded-xl pl-11 pr-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-indigo-200 outline-none w-64" />
+                  </div>
+                </div>
+              </div>
+              <div class="overflow-x-auto min-h-[400px]">
+                <table class="w-full">
+                  <thead class="text-slate-400 text-[11px] uppercase font-bold tracking-widest border-b border-slate-100">
+                    <tr>
+                      <th class="px-4 py-4 text-left">Passenger_ID</th>
+                      <th class="px-4 py-4 text-left">Final score</th>
+                      <th class="px-4 py-4 text-left">Risk band</th>
+                      <th class="px-4 py-4 text-left">ФИО</th>
+                      <th class="px-4 py-4 text-left">Fake Score</th>
+                      <th class="px-4 py-4 text-left">Дата</th>
+                      <th class="px-4 py-4 text-left">Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody id="passengersTableBody" class="divide-y divide-slate-50 text-sm"></tbody>
+                </table>
+              </div>
+              <!-- Пагинация Пассажиры -->
+              <div class="mt-8 flex items-center justify-between border-t border-slate-100 pt-6">
+                <p class="text-xs text-slate-400 font-medium" id="passengersCounter">Показано 0-0 из 0</p>
+                <div class="flex space-x-2">
+                  <button id="prevPassengers" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                    <i class="fas fa-chevron-left"></i>
+                  </button>
+                  <div id="passengersPageNum" class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">1</div>
+                  <button id="nextPassengers" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                    <i class="fas fa-chevron-right"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+           <!-- TAB: OPERATIONS -->
+           <div id="operations" class="tab-content">
+            <div class="card-premium p-6">
+              <h2 class="text-xl font-bold mb-6 flex items-center">
+                <i class="fas fa-history mr-3 text-indigo-600"></i>Операции высокого риска
+              </h2>
+              <div class="overflow-x-auto min-h-[400px]">
+                <table class="w-full text-sm">
+                  <thead class="text-slate-400 text-[11px] uppercase font-bold tracking-widest border-b border-slate-100">
+                    <tr>
+                      <th class="p-4 text-left">Дата/время</th>
+                      <th class="p-4 text-left">Пассажир ID</th>
+                      <th class="p-4 text-left">Поезд</th>
+                      <th class="p-4 text-left">Канал</th>
+                      <th class="p-4 text-left">Терминал</th>
+                      <th class="p-4 text-left">Цена</th>
+                      <th class="p-4 text-left">Тип</th>
+                    </tr>
+                  </thead>
+                  <tbody id="suspiciousOpsBody" class="divide-y divide-slate-50"></tbody>
+                </table>
+              </div>
+              <!-- Пагинация Операции -->
+              <div class="mt-8 flex items-center justify-between border-t border-slate-100 pt-6">
+                <p class="text-xs text-slate-400 font-medium" id="operationsCounter">Показано 0-0 из 0</p>
+                <div class="flex space-x-2">
+                  <button id="prevOperations" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                    <i class="fas fa-chevron-left"></i>
+                  </button>
+                  <div id="operationsPageNum" class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">1</div>
+                  <button id="nextOperations" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                    <i class="fas fa-chevron-right"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: RISK CONCENTRATION -->
+          <div id="riskmap" class="tab-content">
+            <div class="grid md:grid-cols-2 gap-8">
+              <div class="card-premium p-6">
+                <h3 class="font-bold mb-4 flex items-center text-slate-700">
+                  <i class="fas fa-network-wired mr-3 text-indigo-500"></i>Каналы
+                </h3>
+                <div id="channelConcentrationTable"></div>
+              </div>
+              <div class="card-premium p-6">
+                <h3 class="font-bold mb-4 flex items-center text-slate-700">
+                  <i class="fas fa-map-marker-alt mr-3 text-red-500"></i>Терминалы
+                </h3>
+                <div id="terminalRiskTable"></div>
+              </div>
+              <div class="card-premium p-6">
+                <h3 class="font-bold mb-4 flex items-center text-slate-700">
+                   <i class="fas fa-cash-register mr-3 text-orange-500"></i>Кассы
+                </h3>
+                <div id="cashdeskRiskTable"></div>
+              </div>
+              <div class="card-premium p-6">
+                <h3 class="font-bold mb-4 flex items-center text-slate-700">
+                   <i class="fas fa-robot mr-3 text-purple-500"></i>Агрегаторы
+                </h3>
+                <div id="aggregatorTable"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: PROFILE -->
+          <div id="profile" class="tab-content">
+            <div class="card-premium p-8">
+              <div class="flex justify-between items-start mb-8 border-b border-slate-100 pb-6">
+                <div>
+                  <h2 class="text-3xl font-extrabold text-slate-900" id="profileIdHeader">Пассажир: -</h2>
+                  <p class="text-slate-500 text-lg mt-1" id="profileFioSub">ФИО: -</p>
+                </div>
+                <div id="profileRiskBadge" class="px-6 py-2 rounded-2xl font-black text-xl shadow-sm">
+                  Risk: -
+                </div>
+              </div>
+              
+              <div class="grid md:grid-cols-2 gap-10">
+                <div class="space-y-6">
+                  <div class="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100">
+                    <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-3">Детали риска</h4>
+                    <p class="text-slate-700"><i class="fas fa-list-ul w-6 text-indigo-500"></i><strong>Причины:</strong> <span id="profileReasons">-</span></p>
+                  </div>
+                  <div class="p-5">
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Статистика</h4>
+                    <ul class="space-y-3">
+                      <li class="flex justify-between border-b border-slate-50 pb-2"><span class="text-slate-500">Всего билетов:</span> <span class="font-bold" id="profileTotalTickets">-</span></li>
+                      <li class="flex justify-between border-b border-slate-50 pb-2"><span class="text-slate-500">Возвратов:</span> <span class="font-bold" id="profileRefunds">-</span></li>
+                      <li class="flex justify-between border-b border-slate-50 pb-2"><span class="text-slate-500">Доля возвратов:</span> <span class="font-bold" id="profileRefundShare">-</span></li>
+                      <li class="flex justify-between"><span class="text-slate-500">Max за месяц:</span> <span class="font-bold" id="profileMaxMonth">-</span></li>
+                    </ul>
+                  </div>
+                </div>
+                <div class="space-y-6">
+                   <div id="profileSeatBlockBox" class="p-6 rounded-2xl flex items-center">
+                     <!-- Динамический контент -->
+                   </div>
+                   <div class="p-5">
+                     <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">История транзакций</h4>
+                     <div class="overflow-hidden rounded-xl border border-slate-100">
+                        <table class="w-full text-xs">
+                          <thead class="bg-slate-50">
+                            <tr><th class="p-3 text-left">Дата</th><th class="p-3 text-left">Тип</th><th class="p-3 text-left">Сумма</th></tr>
+                          </thead>
+                          <tbody id="profileTxTable" class="divide-y divide-slate-50"></tbody>
+                        </table>
+                     </div>
+                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: UPLOAD -->
+          <div id="upload" class="tab-content">
+            <div class="card-premium p-12 text-center max-w-2xl mx-auto">
+              <div class="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-sm">
+                <i class="fas fa-file-excel text-3xl"></i>
+              </div>
+              <h2 class="text-2xl font-bold mb-2">Загрузка данных</h2>
+              <p class="text-slate-500 mb-8">Выберите Excel-файл с данными о продажах или возвратах для анализа.</p>
+              <div class="border-2 border-dashed border-slate-200 rounded-3xl p-10 hover:border-indigo-400 transition-all group cursor-pointer" onclick="document.getElementById('excelInput').click()">
+                <input type="file" accept=".xlsx,.xls,.csv" id="excelInput" class="hidden" />
+                <i class="fas fa-cloud-upload-alt text-4xl text-slate-300 group-hover:text-indigo-500 transition-colors mb-4"></i>
+                <p class="font-bold text-slate-600">Нажмите для выбора файла</p>
+                <p class="text-xs text-slate-400 mt-2">XLSX, XLS, CSV до 50MB</p>
+              </div>
+              <div id="uploadStatus" class="mt-8 hidden">
+                 <!-- Прогресс -->
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: REPORTS -->
+          <div id="reports" class="tab-content">
+            <div class="grid md:grid-cols-3 gap-6">
+              <div class="card-premium p-6 hover:border-emerald-200">
+                <i class="fas fa-file-excel text-3xl text-emerald-500 mb-4 font-black"></i>
+                <h4 class="font-bold mb-2">Excel Отчет</h4>
+                <p class="text-xs text-slate-500 mb-6">Полный список риск-пассажиров с признаками.</p>
+                <button class="w-full py-2.5 bg-emerald-50 text-emerald-700 rounded-xl font-bold text-sm hover:bg-emerald-100" onclick="window.location.href='/reports/operations/suspicious/excel'">Скачать .xlsx</button>
+              </div>
+              <div class="card-premium p-6 hover:border-red-200">
+                <i class="fas fa-file-pdf text-3xl text-red-500 mb-4 font-black"></i>
+                <h4 class="font-bold mb-2">PDF Досье</h4>
+                <p class="text-xs text-slate-500 mb-6">Детальная карточка подозреваемого (1 пасс.).</p>
+                <button class="w-full py-2.5 bg-red-50 text-red-700 rounded-xl font-bold text-sm hover:bg-red-100" id="pdfReportBtn">Сформировать PDF</button>
+              </div>
+              <div class="card-premium p-6 hover:border-blue-200">
+                <i class="fas fa-file-word text-3xl text-blue-500 mb-4 font-black"></i>
+                <h4 class="font-bold mb-2">DOCX Сводка</h4>
+                <p class="text-xs text-slate-500 mb-6">Аналитическая записка по периоду.</p>
+                <button class="w-full py-2.5 bg-blue-50 text-blue-700 rounded-xl font-bold text-sm hover:bg-blue-100" onclick="alert('В разработке')">Создать .docx</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </main>
+    </div>
+
+    <!-- Теневое модальное окно (если нужно) -->
+    <div id="toast" class="fixed bottom-8 right-8 z-50 transform translate-y-20 opacity-0 transition-all duration-300">
+       <div class="bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center space-x-3">
+          <i id="toastIcon" class="fas fa-info-circle text-indigo-400"></i>
+          <span id="toastMsg" class="font-medium text-sm">Сообщение системы</span>
+       </div>
+    </div>
+
+    <script src="auth.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>

@@ -1,0 +1,33 @@
+postgres:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: postgres
+  db: antifrode_backend_db
+  echo: false
+  pool_size: 30
+  pool_timeout: 30
+  pool_recycle: 3600
+  max_overflow: 20
+  pool_pre_ping: true
+  echo_pool: false
+
+auth:
+  secret_key: "your-super-secret-key-minimum-32-characters-long-for-production"
+  algorithm: "HS256"
+  access_token_expire_minutes: 30
+  refresh_token_expire_days: 7
+  admin_emails:
+    - admin@example.com
+
+telemetry:
+  alloy_base: "http://localhost:4317"
+  export_metrics: true
+  export_traces: true
+  sentry_dsn: null
+  sentry_traces_sample_rate: 1.0
+  sentry_ca_certs: null
+
+ml:
+  url: "http://localhost:8001"
+  timeout: 60

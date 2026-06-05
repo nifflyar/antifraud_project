@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Регистрация — RiskGuard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-50 flex items-center justify-center h-screen font-[Inter]">
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+        <div class="text-center mb-8">
+            <div class="flex items-center justify-center space-x-2 mb-2">
+                <i class="fas fa-shield-alt text-3xl text-indigo-600"></i>
+                <span class="font-bold text-2xl text-gray-800">RiskGuard</span>
+            </div>
+            <p class="text-gray-500">Создание учетной записи</p>
+        </div>
+        
+        <form id="registerForm" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Имя</label>
+                <input type="text" id="fullname" required class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm" placeholder="Иван Иванов">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input type="email" id="email" required class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm" placeholder="admin@example.com">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Пароль</label>
+                <input type="password" id="password" required class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm" placeholder="••••••••">
+            </div>
+
+            <div class="flex items-center">
+                <input type="checkbox" id="isAdmin" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                <label for="isAdmin" class="ml-2 block text-sm text-gray-700">Зарегистрировать как администратор</label>
+            </div>
+
+            <div id="errorMessage" class="text-red-500 text-xs hidden"></div>
+            <div id="successMessage" class="text-green-600 text-xs hidden">Регистрация успешна! Теперь вы можете войти.</div>
+
+            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg transition duration-200">
+                Зарегистрировать
+            </button>
+        </form>
+
+        <div class="mt-6 text-center text-sm text-gray-500">
+            Уже есть аккаунт? <a href="login.html" class="text-indigo-600 hover:underline">Войти</a>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+    <script>
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fullname = document.getElementById('fullname').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const isAdmin = document.getElementById('isAdmin').checked;
+            const errorMsg = document.getElementById('errorMessage');
+            const successMsg = document.getElementById('successMessage');
+            
+            errorMsg.classList.add('hidden');
+            successMsg.classList.add('hidden');
+            
+            const result = await Auth.register(email, password, fullname, isAdmin);
+            if (result.success) {
+                successMsg.classList.remove('hidden');
+                setTimeout(() => window.location.href = 'login.html', 2000);
+            } else {
+                errorMsg.innerText = result.message || 'Ошибка регистрации. Возможно, недостаточно прав.';
+                errorMsg.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
