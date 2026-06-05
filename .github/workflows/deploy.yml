@@ -84,7 +84,7 @@ jobs:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
           SERVER_PORT: ${{ secrets.SERVER_PORT || '22' }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/riskguard' }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/riskguard/antifraud_project' }}
           DEPLOY_BRANCH: ${{ secrets.DEPLOY_BRANCH || 'main' }}
           HEALTH_URL: ${{ secrets.HEALTH_URL || 'http://localhost:8000/health/' }}
         run: |
