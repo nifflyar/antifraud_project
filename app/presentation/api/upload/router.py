@@ -40,7 +40,7 @@ async def upload_excel(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
     filename = file.filename or "unknown.xlsx"
-    if not filename.endswith(".xlsx"):
+    if not filename.lower().endswith(".xlsx"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Только файлы .xlsx поддерживаются"

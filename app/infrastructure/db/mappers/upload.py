@@ -7,8 +7,9 @@ from app.infrastructure.db.models.upload import UploadModel
 class UploadMapper:
     @staticmethod
     def to_domain(model: UploadModel) -> Upload:
+        upload_id = model.id if isinstance(model.id, UploadId) else UploadId(int(model.id))
         return Upload(
-            id=model.id,
+            id=upload_id,
             filename=model.filename,
             filepath=model.filepath,
             uploaded_by_user_id=model.uploaded_by_user_id,
@@ -18,8 +19,9 @@ class UploadMapper:
 
     @staticmethod
     def to_model(upload: Upload) -> UploadModel:
+        upload_id = upload.id.value if isinstance(upload.id, UploadId) else int(upload.id)
         return UploadModel(
-            id=upload.id,
+            id=upload_id,
             filename=upload.filename,
             filepath=upload.filepath,
             uploaded_by_user_id=upload.uploaded_by_user_id,

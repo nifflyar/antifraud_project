@@ -6,7 +6,7 @@ const BACKEND_URL = "http://app:8000";
 const nextConfig: NextConfig = {
   output: "standalone",
   experimental: {
-    proxyClientMaxBodySize: "100mb",
+    proxyClientMaxBodySize: "500mb",
   },
   async rewrites() {
     return [

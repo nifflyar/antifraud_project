@@ -34,7 +34,8 @@ class UploadRepositoryImpl(IUploadRepository, BaseSQLAlchemyRepo):
             del model.id
         self._session.add(model)
         await self._session.flush()
-        upload.id = model.id
+        raw_id = model.id.value if isinstance(model.id, UploadId) else int(model.id)
+        upload.id = UploadId(raw_id)
 
     async def update_upload(self, upload: Upload) -> None:
         stmt = (

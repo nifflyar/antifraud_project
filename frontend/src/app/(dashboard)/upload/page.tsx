@@ -3,11 +3,36 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { uploads, scoring } from "@/lib/api";
 import type { UploadResponse, ScoringStatusResponse } from "@/types/api";
-import { Upload as UploadIcon, FileSpreadsheet, Play, CheckCircle2, Clock, AlertTriangle, Loader2, Zap, TrendingUp } from "lucide-react";
+import { Upload as UploadIcon, FileSpreadsheet, CheckCircle2, Clock, AlertTriangle, Loader2, Zap, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
+
+type ActiveUploadStatus = "sending" | "accepted" | "done" | "failed";
+
+type ActiveUpload = {
+  key: string;
+  filename: string;
+  size: number;
+  status: ActiveUploadStatus;
+  uploadId?: string;
+  message: string;
+};
+
+const normalizeUploadStatus = (status?: string) => (status || "").toLowerCase();
+
+const isUploadInProgress = (status?: string) => {
+  const value = normalizeUploadStatus(status);
+  return value === "pending" || value === "processing";
+};
+
+const formatFileSize = (bytes: number) => {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 MB";
+  const mb = bytes / 1024 / 1024;
+  return `${mb.toFixed(mb >= 10 ? 0 : 1)} MB`;
+};
 
 export default function UploadPage() {
   const [uploadList, setUploadList] = useState<UploadResponse[]>([]);
+  const [activeUploads, setActiveUploads] = useState<ActiveUpload[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState("");
   const [uploadMsgType, setUploadMsgType] = useState<"success" | "error" | "">("");
@@ -29,9 +54,45 @@ export default function UploadPage() {
 
   useEffect(() => { fetchUploads(); }, [fetchUploads]);
 
+  useEffect(() => {
+    const hasActiveHistory = uploadList.some((upload) => isUploadInProgress(upload.status));
+    const hasActiveQueue = activeUploads.some((upload) => upload.status === "sending" || upload.status === "accepted");
+    if (!hasActiveHistory && !hasActiveQueue) return;
+
+    const interval = window.setInterval(() => {
+      fetchUploads();
+    }, 3000);
+
+    return () => window.clearInterval(interval);
+  }, [activeUploads, fetchUploads, uploadList]);
+
+  useEffect(() => {
+    if (uploadList.length === 0) return;
+
+    setActiveUploads((prev) =>
+      prev.map((item) => {
+        if (!item.uploadId) return item;
+        const current = uploadList.find((upload) => upload.id === item.uploadId);
+        if (!current) return item;
+
+        const status = normalizeUploadStatus(current.status);
+        if (status === "done") {
+          return { ...item, status: "done", message: "Готово: данные загружены" };
+        }
+        if (status === "failed") {
+          return { ...item, status: "failed", message: "Ошибка обработки файла" };
+        }
+        if (status === "processing") {
+          return { ...item, status: "accepted", message: "Обработка строк..." };
+        }
+        return { ...item, status: "accepted", message: "Файл принят, ожидает обработки" };
+      })
+    );
+  }, [uploadList]);
+
   const handleFiles = async (files: FileList | File[]) => {
     const list = Array.from(files);
-    const invalid = list.find((file) => !file.name.endsWith(".xlsx"));
+    const invalid = list.find((file) => !file.name.toLowerCase().endsWith(".xlsx"));
     if (invalid) {
       setUploadMsgType("error");
       setUploadMsg(`Только .xlsx файлы поддерживаются (${invalid.name})`);
@@ -42,12 +103,49 @@ export default function UploadPage() {
     let uploaded = 0;
     try {
       for (const file of list) {
-        await uploads.uploadExcel(file);
+        const key = `${file.name}-${file.size}-${file.lastModified}-${Date.now()}`;
+        const activeUpload: ActiveUpload = {
+          key,
+          filename: file.name,
+          size: file.size,
+          status: "sending",
+          message: "Отправка файла на сервер...",
+        };
+        setActiveUploads((prev) => [
+          activeUpload,
+          ...prev,
+        ].slice(0, 12));
+
+        try {
+          const upload = await uploads.uploadExcel(file);
+          setActiveUploads((prev) =>
+            prev.map((item) =>
+              item.key === key
+                ? {
+                    ...item,
+                    uploadId: upload.id,
+                    status: "accepted",
+                    message: "Файл принят, обработка началась",
+                  }
+                : item
+            )
+          );
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Ошибка загрузки";
+          setActiveUploads((prev) =>
+            prev.map((item) =>
+              item.key === key
+                ? { ...item, status: "failed", message }
+                : item
+            )
+          );
+          throw err;
+        }
         uploaded += 1;
       }
       setUploadMsgType("success");
       setUploadMsg(`✓ Принято файлов: ${uploaded}. Обработка начата...`);
-      fetchUploads();
+      await fetchUploads();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Ошибка загрузки";
       setUploadMsgType("error");
@@ -60,6 +158,7 @@ export default function UploadPage() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files?.length) handleFiles(files);
+    e.target.value = "";
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -92,16 +191,18 @@ export default function UploadPage() {
   };
 
   const statusIcon = (status: string) => {
-    switch (status) {
-      case "DONE": case "done": return <CheckCircle2 size={16} style={{ color: "#10b981" }} />;
-      case "PENDING": case "pending": return <Clock size={16} style={{ color: "#f59e0b" }} />;
-      case "PROCESSING": case "running": return <Loader2 size={16} style={{ color: "#3b82f6", animation: "spin 1s linear infinite" }} />;
-      case "FAILED": case "failed": return <AlertTriangle size={16} style={{ color: "#ef4444" }} />;
+    switch (normalizeUploadStatus(status)) {
+      case "sending": return <Loader2 size={16} style={{ color: "#3b82f6", animation: "spin 1s linear infinite" }} />;
+      case "accepted": return <Clock size={16} style={{ color: "#f59e0b" }} />;
+      case "done": return <CheckCircle2 size={16} style={{ color: "#10b981" }} />;
+      case "pending": return <Clock size={16} style={{ color: "#f59e0b" }} />;
+      case "processing": case "running": return <Loader2 size={16} style={{ color: "#3b82f6", animation: "spin 1s linear infinite" }} />;
+      case "failed": return <AlertTriangle size={16} style={{ color: "#ef4444" }} />;
       default: return <Clock size={16} style={{ color: "var(--text-muted)" }} />;
     }
   };
 
-  const completedUploads = uploadList.filter(u => u.status === "DONE").length;
+  const completedUploads = uploadList.filter(u => normalizeUploadStatus(u.status) === "done").length;
   const scoredUploads = Object.keys(scoringJobs).filter(k => scoringJobs[k].status === "done").length;
 
   return (
@@ -154,7 +255,7 @@ export default function UploadPage() {
           <p style={{ fontWeight: 600, color: "var(--text-secondary)" }}>
             {uploading ? "Загрузка..." : "Нажмите или перетащите один/несколько файлов"}
           </p>
-          <p style={{ fontSize: "0.8125rem", color: "var(--text-muted)", marginTop: 8 }}>XLSX до 200MB</p>
+          <p style={{ fontSize: "0.8125rem", color: "var(--text-muted)", marginTop: 8 }}>XLSX до 500MB</p>
         </div>
 
         {uploadMsg && (
@@ -174,6 +275,39 @@ export default function UploadPage() {
           >
             {uploadMsg}
           </motion.div>
+        )}
+
+        {activeUploads.length > 0 && (
+          <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 8, textAlign: "left" }}>
+            {activeUploads.map((item) => (
+              <div
+                key={item.key}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "auto 1fr auto",
+                  gap: 12,
+                  alignItems: "center",
+                  padding: "12px 14px",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-md)",
+                  background: "var(--surface-elevated)",
+                }}
+              >
+                {statusIcon(item.status)}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 650, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {item.filename}
+                  </div>
+                  <div style={{ color: "var(--text-muted)", fontSize: "0.8125rem", marginTop: 2 }}>
+                    {item.message}
+                  </div>
+                </div>
+                <div className="mono" style={{ color: "var(--text-muted)", fontSize: "0.8125rem" }}>
+                  {formatFileSize(item.size)}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </motion.div>
 
@@ -204,7 +338,8 @@ export default function UploadPage() {
               <tbody>
                 {uploadList.map((u) => {
                   const job = scoringJobs[u.id];
-                  const isScoringReady = u.status === "DONE";
+                  const uploadStatus = normalizeUploadStatus(u.status);
+                  const isScoringReady = uploadStatus === "done";
                   const isScoring = !!job;
 
                   return (
@@ -220,7 +355,7 @@ export default function UploadPage() {
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                           {statusIcon(u.status)}
                           <span style={{ fontSize: "0.8125rem", textTransform: "uppercase", fontWeight: 600 }}>
-                            {u.status === "DONE" ? "Готово" : u.status === "PROCESSING" ? "Обработка" : u.status}
+                            {uploadStatus === "done" ? "Готово" : uploadStatus === "processing" ? "Обработка" : uploadStatus === "pending" ? "В очереди" : uploadStatus || u.status}
                           </span>
                         </div>
                       </td>
