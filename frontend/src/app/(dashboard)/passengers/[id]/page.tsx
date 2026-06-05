@@ -6,7 +6,7 @@ import { passengers as passApi } from "@/lib/api";
 import type { PassengerProfile, PassengerTransaction, RiskBand } from "@/types/api";
 import RiskBadge from "@/components/RiskBadge";
 import { useAuth } from "@/lib/auth-context";
-import { ArrowLeft, AlertTriangle, Building2, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, FileText, IdCard, MapPin, Monitor, Phone, ShieldAlert, Ticket, TrendingUp, UserRound, Zap } from "lucide-react";
+import { ArrowLeft, AlertTriangle, Building2, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, FileText, IdCard, MapPin, Monitor, ShieldAlert, Ticket, TrendingUp, UserRound, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface RiskFeature {
@@ -15,6 +15,157 @@ interface RiskFeature {
   color?: string;
   icon?: React.ReactNode;
 }
+
+type RiskReasonSeverity = "critical" | "high" | "medium" | "low";
+
+interface RiskReasonView {
+  title: string;
+  detail: string;
+  category: string;
+  severity: RiskReasonSeverity;
+}
+
+const riskReasonStyle = (severity: RiskReasonSeverity) => {
+  switch (severity) {
+    case "critical":
+      return { background: "var(--risk-critical-bg)", border: "#fecdd3", color: "var(--risk-critical)" };
+    case "high":
+      return { background: "var(--risk-high-bg)", border: "#fed7aa", color: "var(--risk-high)" };
+    case "medium":
+      return { background: "var(--risk-medium-bg)", border: "#fde68a", color: "var(--risk-medium)" };
+    default:
+      return { background: "var(--bg-secondary)", border: "var(--border)", color: "var(--text-secondary)" };
+  }
+};
+
+const formatRiskReason = (reason: string): RiskReasonView => {
+  const raw = String(reason || "").trim();
+  const lower = raw.toLowerCase();
+
+  const closeRefunds = raw.match(/(\d+)\s+refunds within 24h of departure(?:\s+\((\d+)%\))?/i);
+  if (closeRefunds) {
+    const count = closeRefunds[1];
+    const pct = closeRefunds[2];
+    return {
+      title: "Возвраты перед отправлением",
+      detail: `${count} возвратов сделаны в пределах 24 часов до отправления${pct ? `, это ${pct}% таких возвратов` : ""}. Это сильный сигнал удержания мест или поздней отмены.`,
+      category: "Время операции",
+      severity: "critical",
+    };
+  }
+
+  const refundShare = raw.match(/(\d+)%\s+refund share/i);
+  if (refundShare) {
+    const pct = Number(refundShare[1]);
+    return {
+      title: "Повышенная доля возвратов",
+      detail: `Возвраты составляют ${pct}% операций пассажира. Сервис учитывает это как риск только вместе с другими поведенческими признаками.`,
+      category: "Возвраты",
+      severity: pct >= 50 ? "high" : "medium",
+    };
+  }
+
+  const refundCount = raw.match(/^(\d+)\s+refunds$/i);
+  if (refundCount) {
+    const count = Number(refundCount[1]);
+    return {
+      title: "Много возвратов",
+      detail: `${count} возвратов у одного пассажира. Само по себе это не приговор, но усиливает риск при совпадении по времени, маршруту или суммам.`,
+      category: "Возвраты",
+      severity: count >= 10 ? "high" : count >= 5 ? "medium" : "low",
+    };
+  }
+
+  const sameTrain = raw.match(/(\d+)\s+tickets for same train and departure/i);
+  if (sameTrain) {
+    const count = Number(sameTrain[1]);
+    return {
+      title: "Концентрация на одном рейсе",
+      detail: `${count} билетов связаны с одним поездом и временем отправления. Такой кластер может указывать на удержание мест группой операций.`,
+      category: "Seat-blocking",
+      severity: count >= 10 ? "high" : "medium",
+    };
+  }
+
+  const sameDay = raw.match(/(\d+)\s+tickets for same departure day/i);
+  if (sameDay) {
+    const count = Number(sameDay[1]);
+    return {
+      title: "Много билетов на одну дату",
+      detail: `${count} билетов приходятся на одну дату отправления. Это помогает выявлять массовые или скоординированные действия.`,
+      category: "Объём",
+      severity: count >= 20 ? "high" : "medium",
+    };
+  }
+
+  const rapidCancel = raw.match(/(\d+)\s+tickets cancelled within 10 minutes/i);
+  if (rapidCancel) {
+    const count = Number(rapidCancel[1]);
+    return {
+      title: "Быстрые отмены",
+      detail: `${count} билетов отменены в течение 10 минут после оформления. Это похоже на технический цикл оформления и отмены.`,
+      category: "Повторяемость",
+      severity: count >= 5 ? "high" : "medium",
+    };
+  }
+
+  const terminals = raw.match(/operations across (\d+)\s+different terminals/i);
+  if (terminals) {
+    const count = Number(terminals[1]);
+    return {
+      title: "Много терминалов",
+      detail: `Операции проходили через ${count} разных терминалов. Это не доказывает риск само по себе, но важно при больших объёмах и возвратах.`,
+      category: "Концентрация",
+      severity: count >= 10 ? "high" : "medium",
+    };
+  }
+
+  const fioScore = raw.match(/(?:fio pattern appears fake|unusual fio pattern).*score\s+(\d+)\/10/i);
+  if (fioScore) {
+    const score = Number(fioScore[1]);
+    return {
+      title: lower.includes("no behavioral corroboration") ? "Подозрительный формат ФИО без подтверждения" : "Подозрительный формат ФИО",
+      detail: `Формат имени получил ${score}/10 по признаку искусственного или технического заполнения. Сервис не повышает риск только из-за ФИО без поведенческих сигналов.`,
+      category: "Идентичность",
+      severity: score >= 8 && !lower.includes("no behavioral corroboration") ? "high" : "medium",
+    };
+  }
+
+  const nightOps = raw.match(/(\d+)%\s+night operations/i);
+  if (nightOps) {
+    return {
+      title: "Ночная активность",
+      detail: `${nightOps[1]}% операций пришлись на ночное время. Это учитывается как дополнительный, а не самостоятельный риск.`,
+      category: "Время операции",
+      severity: "medium",
+    };
+  }
+
+  if (lower.includes("strong seat-blocking pattern")) {
+    return {
+      title: "Сильный паттерн удержания мест",
+      detail: "Сочетание объёма, повторяемости и возвратов похоже на сценарий блокировки мест перед отправлением.",
+      category: "Seat-blocking",
+      severity: "critical",
+    };
+  }
+
+  if (lower.includes("same_iin_multiple_fio") || lower.includes("identity")) {
+    return {
+      title: "Расхождение идентификаторов",
+      detail: "В скрытых идентификаторах есть несоответствие между пассажирскими данными. Значения не раскрываются в интерфейсе.",
+      category: "Идентичность",
+      severity: "high",
+    };
+  }
+
+  return {
+    title: "Сигнал риска",
+    detail: raw || "Обнаружен дополнительный риск-фактор.",
+    category: "Общее",
+    severity: "medium",
+  };
+};
 
 export default function PassengerProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -153,6 +304,7 @@ export default function PassengerProfilePage() {
       identity.distinct_phone_count > 1
     )
   );
+  const riskReasons = score?.top_reasons.map(formatRiskReason) || [];
 
   return (
     <div>
@@ -225,14 +377,15 @@ export default function PassengerProfilePage() {
             {identityHasConflicts && (
               <div style={{ marginBottom: 12, padding: 12, borderRadius: "var(--radius-md)", background: "var(--risk-medium-bg)", border: "1px solid #fde68a", color: "var(--text-primary)", fontSize: "0.8125rem", display: "flex", gap: 8, alignItems: "center" }}>
                 <AlertTriangle size={14} style={{ color: "var(--risk-medium)" }} />
-                Есть расхождения в идентификаторах: ИИН {identity.distinct_iin_count || 0}, документы {identity.distinct_doc_count || 0}, телефоны {identity.distinct_phone_count || 0}
+                Обнаружены расхождения в скрытых идентификаторах. Значения ИИН, документов и телефонов не отображаются в интерфейсе.
               </div>
             )}
+            <div style={{ marginBottom: 12, padding: 12, borderRadius: "var(--radius-md)", background: "var(--bg-secondary)", border: "1px solid var(--border)", color: "var(--text-secondary)", fontSize: "0.8125rem", display: "flex", gap: 8, alignItems: "center" }}>
+              <ShieldAlert size={14} style={{ color: "var(--accent)" }} />
+              ИИН, номер документа и телефон скрыты. Сервис использует их только для поиска совпадений и расхождений.
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
               {[
-                { label: "ИИН", value: formatValue(identity.iin), icon: <IdCard size={16} /> },
-                { label: "№ документа", value: formatValue(identity.doc_no), icon: <FileText size={16} /> },
-                { label: "Телефон", value: formatValue(identity.phone), icon: <Phone size={16} /> },
                 { label: "Пол", value: formatValue(identity.gender), icon: <UserRound size={16} /> },
                 { label: "ФИО из файла", value: formatValue(identity.raw_fio), icon: <UserRound size={16} /> },
                 { label: "Период операций", value: `${formatDateTime(identity.first_operation_at)} — ${formatDateTime(identity.last_operation_at)}`, icon: <CalendarClock size={16} /> },
@@ -248,6 +401,7 @@ export default function PassengerProfilePage() {
                 { label: "Агрегаторы", value: formatList(identity.aggregators), icon: <Monitor size={16} /> },
                 { label: "Разных ИИН", value: String(identity.distinct_iin_count || 0), icon: <IdCard size={16} /> },
                 { label: "Разных документов", value: String(identity.distinct_doc_count || 0), icon: <FileText size={16} /> },
+                { label: "Разных телефонов", value: String(identity.distinct_phone_count || 0), icon: <ShieldAlert size={16} /> },
                 { label: "Уникальных терминалов", value: String(identity.distinct_terminal_count || 0), icon: <Monitor size={16} /> },
                 { label: "Уникальных маршрутов", value: String(identity.distinct_route_count || 0), icon: <MapPin size={16} /> },
               ].map((item) => (
@@ -288,18 +442,54 @@ export default function PassengerProfilePage() {
         )}
 
         {/* Risk Reasons */}
-        {score && score.top_reasons.length > 0 && (
-          <div style={{ marginBottom: 24, padding: 20, background: "var(--accent-light)", borderRadius: "var(--radius-md)", border: "1px solid #c7d2fe" }}>
+        {score && riskReasons.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
             <h4 style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--accent)", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
               <Zap size={14} /> Причины риска
             </h4>
-            <ul style={{ listStyle: "none", padding: 0 }}>
-              {score.top_reasons.map((r, i) => (
-                <li key={i} style={{ padding: "6px 0", fontSize: "0.875rem", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: 8 }}>
-                  <AlertTriangle size={14} style={{ color: "var(--accent)" }} /> {r}
-                </li>
-              ))}
-            </ul>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+              {riskReasons.map((reason, i) => {
+                const tone = riskReasonStyle(reason.severity);
+                return (
+                  <div
+                    key={`${reason.title}-${i}`}
+                    style={{
+                      padding: 14,
+                      borderRadius: "var(--radius-md)",
+                      background: tone.background,
+                      border: `1px solid ${tone.border}`,
+                      minWidth: 0,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start", marginBottom: 8 }}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0 }}>
+                        <AlertTriangle size={15} style={{ color: tone.color, flex: "0 0 auto" }} />
+                        <p style={{ fontWeight: 800, fontSize: "0.875rem", color: "var(--text-primary)", overflowWrap: "anywhere" }}>
+                          {reason.title}
+                        </p>
+                      </div>
+                      <span
+                        style={{
+                          padding: "3px 7px",
+                          borderRadius: 999,
+                          background: "rgba(255,255,255,0.65)",
+                          border: `1px solid ${tone.border}`,
+                          color: tone.color,
+                          fontSize: "0.6875rem",
+                          fontWeight: 800,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {reason.category}
+                      </span>
+                    </div>
+                    <p style={{ color: "var(--text-secondary)", fontSize: "0.8125rem", lineHeight: 1.45 }}>
+                      {reason.detail}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -366,9 +556,6 @@ export default function PassengerProfilePage() {
                   <th>Маршрут</th>
                   <th>Канал</th>
                   <th>Терминал</th>
-                  <th>ИИН</th>
-                  <th>Документ</th>
-                  <th>Телефон</th>
                   <th>Тариф</th>
                   <th>Класс</th>
                   <th style={{ textAlign: "right" }}>Сумма</th>
@@ -378,13 +565,13 @@ export default function PassengerProfilePage() {
                 {txLoading ? (
                   [...Array(5)].map((_, i) => (
                     <tr key={i}>
-                      <td colSpan={13} style={{ padding: 0 }}>
+                      <td colSpan={10} style={{ padding: 0 }}>
                         <div className="skeleton" style={{ height: 40, margin: 0, borderRadius: 0 }} />
                       </td>
                     </tr>
                   ))
                 ) : txs.length === 0 ? (
-                  <tr><td colSpan={13} style={{ textAlign: "center", padding: 32, color: "var(--text-muted)" }}>История пуста</td></tr>
+                  <tr><td colSpan={10} style={{ textAlign: "center", padding: 32, color: "var(--text-muted)" }}>История пуста</td></tr>
                 ) : (
                   txs.map((tx) => (
                     <tr key={tx.id}>
@@ -411,9 +598,6 @@ export default function PassengerProfilePage() {
                           </button>
                         ) : "—"}
                       </td>
-                      <td className="mono" style={{ fontSize: "0.8125rem" }}>{tx.iin || "—"}</td>
-                      <td className="mono" style={{ fontSize: "0.8125rem" }}>{tx.doc_no || "—"}</td>
-                      <td className="mono" style={{ fontSize: "0.8125rem" }}>{tx.phone || "—"}</td>
                       <td style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>{tx.tariff_type || "—"}</td>
                       <td style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>{tx.service_class || "—"}</td>
                       <td className="mono" style={{ textAlign: "right", fontWeight: 600 }}>{tx.amount.toLocaleString()} ₸</td>
