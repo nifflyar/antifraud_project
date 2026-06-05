@@ -80,7 +80,7 @@ export default function UploadPage() {
           return { ...item, status: "done", message: "Готово: данные загружены" };
         }
         if (status === "failed") {
-          return { ...item, status: "failed", message: "Ошибка обработки файла" };
+          return { ...item, status: "failed", message: current.error_message || "Ошибка обработки файла" };
         }
         if (status === "processing") {
           return { ...item, status: "accepted", message: "Обработка строк..." };
@@ -358,6 +358,22 @@ export default function UploadPage() {
                             {uploadStatus === "done" ? "Готово" : uploadStatus === "processing" ? "Обработка" : uploadStatus === "pending" ? "В очереди" : uploadStatus || u.status}
                           </span>
                         </div>
+                        {uploadStatus === "failed" && u.error_message && (
+                          <div
+                            title={u.error_message}
+                            style={{
+                              marginTop: 4,
+                              color: "#ef4444",
+                              fontSize: "0.75rem",
+                              maxWidth: 320,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {u.error_message}
+                          </div>
+                        )}
                       </td>
                       <td style={{ fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
                         {new Date(u.uploaded_at).toLocaleString("ru-RU", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}

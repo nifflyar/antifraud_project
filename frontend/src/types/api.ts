@@ -294,6 +294,7 @@ export interface UploadResponse {
   status: string;
   uploaded_at: string;
   uploaded_by_user_id: string | null;
+  error_message?: string | null;
 }
 
 export interface UploadListResponse {

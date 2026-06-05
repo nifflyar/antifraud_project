@@ -17,6 +17,7 @@ class GetUploadOutputDTO:
     status: str
     uploaded_at: str
     uploaded_by_user_id: int | None
+    error_message: str | None = None
 
 
 class GetUploadInteractor(Interactor[GetUploadInputDTO, GetUploadOutputDTO]):
@@ -35,4 +36,5 @@ class GetUploadInteractor(Interactor[GetUploadInputDTO, GetUploadOutputDTO]):
             status=str(upload.status.value),
             uploaded_at=upload.uploaded_at.isoformat(),
             uploaded_by_user_id=int(upload.uploaded_by_user_id.value) if upload.uploaded_by_user_id else None,
+            error_message=upload.error_message,
         )

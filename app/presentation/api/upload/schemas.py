@@ -8,6 +8,7 @@ class UploadResponse(BaseModel):
     status: str
     uploaded_at: str
     uploaded_by_user_id: Optional[str]
+    error_message: Optional[str] = None
 
 
 class UploadListResponse(BaseModel):

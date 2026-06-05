@@ -108,6 +108,7 @@ COLUMN_ALIASES: dict[str, str] = {
     # tariff/service
     "тип тарифа": "tariff_type",
     "тип тарифа (льгота)": "tariff_type",
+    "тариф и льгота": "tariff_type",
     "льгота": "tariff_type",
     "tariff_type": "tariff_type",
     "класс обслуживания": "service_class",

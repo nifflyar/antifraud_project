@@ -15,6 +15,7 @@ class UploadMapper:
             uploaded_by_user_id=model.uploaded_by_user_id,
             uploaded_at=model.uploaded_at,
             status=model.status,
+            error_message=model.error_message,
         )
 
     @staticmethod
@@ -27,4 +28,5 @@ class UploadMapper:
             uploaded_by_user_id=upload.uploaded_by_user_id,
             uploaded_at=upload.uploaded_at,
             status=upload.status,
+            error_message=upload.error_message,
         )

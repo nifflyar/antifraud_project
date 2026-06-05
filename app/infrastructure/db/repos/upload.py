@@ -45,6 +45,7 @@ class UploadRepositoryImpl(IUploadRepository, BaseSQLAlchemyRepo):
                 status=upload.status,
                 filename=upload.filename,
                 filepath=upload.filepath,
+                error_message=upload.error_message,
             )
         )
         await self._session.execute(stmt)

@@ -16,7 +16,7 @@
 Проект должен быть уже склонирован на сервер, например:
 
 ```bash
-/opt/riskguard
+/opt/riskguard/antifraud_project
 ```
 
 В этой папке должны лежать серверные файлы:
@@ -29,7 +29,7 @@ config.docker.yaml
 Проверка ручного деплоя:
 
 ```bash
-cd /opt/riskguard
+cd /opt/riskguard/antifraud_project
 bash scripts/deploy_pull_restart.sh
 ```
 
@@ -60,7 +60,7 @@ SERVER_SSH_KEY=приватный SSH ключ
 
 ```text
 SERVER_PORT=22
-DEPLOY_PATH=/opt/riskguard
+DEPLOY_PATH=/opt/riskguard/antifraud_project
 DEPLOY_BRANCH=main
 HEALTH_URL=http://localhost:8000/health/
 ```

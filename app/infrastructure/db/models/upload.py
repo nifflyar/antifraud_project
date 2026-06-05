@@ -25,3 +25,4 @@ class UploadModel(BaseORMModel):
         nullable=False,
         default=UploadStatus.PENDING,
     )
+    error_message: Mapped[str | None] = mapped_column(String(2048), nullable=True)

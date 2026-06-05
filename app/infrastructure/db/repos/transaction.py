@@ -52,6 +52,38 @@ _TRANSACTION_COPY_COLUMNS = (
     "passenger_id",
 )
 
+_TRANSACTION_STRING_LIMITS = {
+    "source": 50,
+    "train_no": 50,
+    "channel": 100,
+    "aggregator": 100,
+    "terminal": 100,
+    "cashdesk": 100,
+    "point_of_sale": 100,
+    "fio": 255,
+    "iin": 20,
+    "doc_no": 50,
+    "phone": 50,
+    "gender": 20,
+    "ticket_no": 50,
+    "tariff_type": 100,
+    "service_class": 100,
+    "branch": 150,
+    "sale_user": 150,
+    "carrier": 150,
+    "settlement_type": 100,
+    "order_no": 50,
+    "dep_station": 255,
+    "arr_station": 255,
+    "route": 512,
+}
+
+
+def _clip_text(value: str | None, max_len: int) -> str | None:
+    if value is None:
+        return None
+    return value[:max_len]
+
 
 def _suspicious_cache_key(**kwargs) -> str:
     parts = []
@@ -394,11 +426,17 @@ class TransactionRepositoryImpl(ITransactionRepository, BaseSQLAlchemyRepo):
         chunk_size = 20000
         for chunk_start in range(0, len(transactions), chunk_size):
             chunk = transactions[chunk_start : chunk_start + chunk_size]
-            await driver_conn.copy_records_to_table(
-                temp_table,
-                records=[self._to_copy_record(tx) for tx in chunk],
-                columns=_TRANSACTION_COPY_COLUMNS,
-            )
+            try:
+                await driver_conn.copy_records_to_table(
+                    temp_table,
+                    records=[self._to_copy_record(tx) for tx in chunk],
+                    columns=_TRANSACTION_COPY_COLUMNS,
+                )
+            except Exception as exc:
+                raise ValueError(
+                    f"Ошибка bulk-вставки транзакций "
+                    f"(строки чанка {chunk_start + 1}-{chunk_start + len(chunk)}): {exc}"
+                ) from exc
             await self._session.execute(
                 text(f"""
                     INSERT INTO transactions ({column_list})
@@ -414,34 +452,34 @@ class TransactionRepositoryImpl(ITransactionRepository, BaseSQLAlchemyRepo):
         return (
             tx.id.value,
             tx.upload_id.value,
-            tx.source,
+            _clip_text(tx.source, _TRANSACTION_STRING_LIMITS["source"]),
             tx.op_type.value,
             tx.op_datetime,
             tx.dep_datetime,
-            tx.train_no,
-            tx.channel,
-            tx.aggregator,
-            tx.terminal,
-            tx.cashdesk,
-            tx.point_of_sale,
+            _clip_text(tx.train_no, _TRANSACTION_STRING_LIMITS["train_no"]),
+            _clip_text(tx.channel, _TRANSACTION_STRING_LIMITS["channel"]),
+            _clip_text(tx.aggregator, _TRANSACTION_STRING_LIMITS["aggregator"]),
+            _clip_text(tx.terminal, _TRANSACTION_STRING_LIMITS["terminal"]),
+            _clip_text(tx.cashdesk, _TRANSACTION_STRING_LIMITS["cashdesk"]),
+            _clip_text(tx.point_of_sale, _TRANSACTION_STRING_LIMITS["point_of_sale"]),
             tx.amount,
             tx.fee,
-            tx.fio,
-            tx.iin,
-            tx.doc_no,
-            tx.phone,
-            tx.gender,
-            tx.ticket_no,
-            tx.tariff_type,
-            tx.service_class,
-            tx.branch,
-            tx.sale_user,
-            tx.carrier,
-            tx.settlement_type,
-            tx.order_no,
-            tx.dep_station,
-            tx.arr_station,
-            tx.route,
+            _clip_text(tx.fio, _TRANSACTION_STRING_LIMITS["fio"]),
+            _clip_text(tx.iin, _TRANSACTION_STRING_LIMITS["iin"]),
+            _clip_text(tx.doc_no, _TRANSACTION_STRING_LIMITS["doc_no"]),
+            _clip_text(tx.phone, _TRANSACTION_STRING_LIMITS["phone"]),
+            _clip_text(tx.gender, _TRANSACTION_STRING_LIMITS["gender"]),
+            _clip_text(tx.ticket_no, _TRANSACTION_STRING_LIMITS["ticket_no"]),
+            _clip_text(tx.tariff_type, _TRANSACTION_STRING_LIMITS["tariff_type"]),
+            _clip_text(tx.service_class, _TRANSACTION_STRING_LIMITS["service_class"]),
+            _clip_text(tx.branch, _TRANSACTION_STRING_LIMITS["branch"]),
+            _clip_text(tx.sale_user, _TRANSACTION_STRING_LIMITS["sale_user"]),
+            _clip_text(tx.carrier, _TRANSACTION_STRING_LIMITS["carrier"]),
+            _clip_text(tx.settlement_type, _TRANSACTION_STRING_LIMITS["settlement_type"]),
+            _clip_text(tx.order_no, _TRANSACTION_STRING_LIMITS["order_no"]),
+            _clip_text(tx.dep_station, _TRANSACTION_STRING_LIMITS["dep_station"]),
+            _clip_text(tx.arr_station, _TRANSACTION_STRING_LIMITS["arr_station"]),
+            _clip_text(tx.route, _TRANSACTION_STRING_LIMITS["route"]),
             tx.passenger_id.value if tx.passenger_id else None,
         )
 

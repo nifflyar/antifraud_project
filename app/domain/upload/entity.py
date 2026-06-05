@@ -15,20 +15,24 @@ class Upload:
     uploaded_by_user_id: UserId
     uploaded_at: datetime
     status: UploadStatus
+    error_message: str | None = None
 
 
     def mark_processing(self) -> None:
         if self.status != UploadStatus.PENDING:
             raise ValueError(f"Cannot start processing: status is {self.status}")
         self.status = UploadStatus.PROCESSING
+        self.error_message = None
 
     def mark_done(self) -> None:
         if self.status not in (UploadStatus.PROCESSING, UploadStatus.PENDING):
             raise ValueError(f"Cannot complete: status is {self.status}")
         self.status = UploadStatus.DONE
+        self.error_message = None
 
-    def mark_failed(self) -> None:
+    def mark_failed(self, error_message: str | None = None) -> None:
         self.status = UploadStatus.FAILED
+        self.error_message = error_message
 
     def is_complete(self) -> bool:
         return self.status == UploadStatus.DONE
@@ -44,4 +48,5 @@ class Upload:
             uploaded_by_user_id=UserId(uploaded_by_user_id),
             uploaded_at=datetime.now(UTC),
             status=UploadStatus.PENDING,
+            error_message=None,
         )

@@ -59,6 +59,7 @@ class CreateUploadInteractor(Interactor[CreateUploadInputDTO, CreateUploadOutput
             uploaded_by_user_id=data.user_id, # Передаем UserId объект
             uploaded_at=datetime.now(UTC),
             status=UploadStatus.PENDING,
+            error_message=None,
         )
 
         await self.upload_repository.create_upload(upload)

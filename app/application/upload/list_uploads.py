@@ -17,6 +17,7 @@ class UploadListItemDTO:
     status: str
     uploaded_at: str
     uploaded_by_user_id: int | None
+    error_message: str | None = None
 
 
 @dataclass
@@ -48,6 +49,7 @@ class ListUploadsInteractor(Interactor[ListUploadsInputDTO, ListUploadsOutputDTO
                 status=str(u.status.value),
                 uploaded_at=u.uploaded_at.isoformat(),
                 uploaded_by_user_id=int(u.uploaded_by_user_id.value) if u.uploaded_by_user_id else None,
+                error_message=u.error_message,
             )
             for u in uploads
         ]

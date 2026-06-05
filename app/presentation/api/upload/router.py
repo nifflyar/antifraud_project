@@ -160,6 +160,7 @@ async def upload_excel(
             status=upload_dto.status,
             uploaded_at=str(upload_dto.uploaded_at),
             uploaded_by_user_id=str(claims.user_id.value) if claims.user_id else None,
+            error_message=None,
         )
     except Exception as e:
         # Clean up on error
@@ -198,6 +199,7 @@ async def list_uploads(
                 status=item.status,
                 uploaded_at=str(item.uploaded_at),
                 uploaded_by_user_id=str(item.uploaded_by_user_id) if item.uploaded_by_user_id else None,
+                error_message=item.error_message,
             )
             for item in result.items
         ],
@@ -228,6 +230,7 @@ async def get_upload(
             status=result.status,
             uploaded_at=str(result.uploaded_at),
             uploaded_by_user_id=str(result.uploaded_by_user_id) if result.uploaded_by_user_id else None,
+            error_message=getattr(result, "error_message", None),
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

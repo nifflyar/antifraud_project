@@ -336,7 +336,7 @@ class EtlPipeline:
         try:
             upload = await self._upload_repo.get_by_id(uid)
             if upload:
-                upload.mark_failed()
+                upload.mark_failed(error[:2048])
                 await self._upload_repo.update_upload(upload)
         except Exception:
             logger.exception("Не удалось обновить статус upload_id=%s на FAILED", uid_str)
