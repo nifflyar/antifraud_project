@@ -64,7 +64,7 @@ export default function TerminalsPage() {
     const fetchTerminals = async () => {
       setLoadingTerminals(true);
       try {
-        const res = await dashboard.riskConcentration("TERMINAL");
+        const res = await dashboard.riskConcentration("TERMINAL", true);
         setTerminals(res.items || []);
       } catch {
         setTerminals([]);
@@ -117,8 +117,9 @@ export default function TerminalsPage() {
   );
 
   const selectTerminal = (terminal: string) => {
-    setSelectedTerminal(terminal);
     setTerminalSearch(terminal);
+    if (terminal === selectedTerminal) return;
+    setSelectedTerminal(terminal);
     setItems([]);
     setTotal(0);
     setOperationRiskStats(null);
@@ -151,6 +152,22 @@ export default function TerminalsPage() {
       setTotal(res.total || 0);
       if (res.risk_stats) {
         setOperationRiskStats(res.risk_stats);
+        const hasFilters = Boolean(opType || debouncedSearch || dateFrom || dateTo);
+        if (!hasFilters) {
+          setTerminals((prev) =>
+            prev.map((terminal) => {
+              if (terminal.dimension_value !== selectedTerminal) return terminal;
+              const nextTotal = res.total || 0;
+              const nextRiskOps = res.risk_stats?.suspicious ?? 0;
+              return {
+                ...terminal,
+                total_ops: nextTotal,
+                highrisk_ops: nextRiskOps,
+                share_highrisk_ops: nextTotal ? nextRiskOps / nextTotal : 0,
+              };
+            })
+          );
+        }
       }
     } catch {
       setItems([]);
@@ -167,9 +184,9 @@ export default function TerminalsPage() {
 
   const offset = (page - 1) * limit;
   const pages = Math.max(1, Math.ceil(total / limit));
-  const totalOps = selectedTerminal ? total : (selectedStats?.total_ops ?? 0);
-  const riskyOps = operationRiskStats?.suspicious ?? items.filter((item) => item.risk_band !== "low").length;
-  const highCriticalOps = operationRiskStats?.high_critical ?? items.filter((item) => item.risk_band === "high" || item.risk_band === "critical").length;
+  const totalOps = selectedTerminal ? (operationRiskStats ? total : selectedStats?.total_ops ?? total) : (selectedStats?.total_ops ?? 0);
+  const riskyOps = operationRiskStats?.suspicious ?? selectedStats?.highrisk_ops ?? 0;
+  const highCriticalOps = operationRiskStats?.high_critical ?? 0;
   const share = totalOps ? (riskyOps / totalOps) * 100 : 0;
   const lift = selectedStats ? (selectedStats.lift_vs_base - 1) * 100 : 0;
   const hasOperationFilters = Boolean(opType || search || dateFrom || dateTo);
