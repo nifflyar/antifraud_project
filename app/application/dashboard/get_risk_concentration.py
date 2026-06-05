@@ -35,7 +35,7 @@ class GetRiskConcentrationInteractor:
                 ],
             )
 
-        stats = await self._tx_repo.get_live_dimension_stats(dimension_column=dtype.value)
+        stats = await self._tx_repo.get_dimension_stats_by_passenger_score(dimension_column=dtype.value)
         total_ops = sum(row["total_count"] for row in stats)
         total_risky_ops = sum(row["suspicious_count"] for row in stats)
         base_share = total_risky_ops / total_ops if total_ops else 0.0

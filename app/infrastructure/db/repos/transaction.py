@@ -306,7 +306,11 @@ class TransactionRepositoryImpl(ITransactionRepository, BaseSQLAlchemyRepo):
                 PassengerScoreModel,
                 TransactionModel.passenger_id == PassengerScoreModel.passenger_id,
             )
-            .where(PassengerScoreModel.final_score >= 40)
+            .where(
+                PassengerScoreModel.risk_band.in_(
+                    [RiskBand.medium.value, RiskBand.high.value, RiskBand.critical.value]
+                )
+            )
         )
         result = await self._session.execute(stmt)
         return result.scalar_one() or 0
@@ -354,7 +358,25 @@ class TransactionRepositoryImpl(ITransactionRepository, BaseSQLAlchemyRepo):
         date_from: datetime | None = None,
         date_to: datetime | None = None,
     ) -> dict[str, int]:
-        scored = await self._get_scored_operations(
+        band_expr = PassengerScoreModel.risk_band
+        critical_expr = case((band_expr == RiskBand.critical.value, 1), else_=0)
+        high_expr = case((band_expr == RiskBand.high.value, 1), else_=0)
+        medium_expr = case((band_expr == RiskBand.medium.value, 1), else_=0)
+
+        stmt = (
+            select(
+                func.count(TransactionModel.id).label("total"),
+                func.coalesce(func.sum(critical_expr), 0).label("critical"),
+                func.coalesce(func.sum(high_expr), 0).label("high"),
+                func.coalesce(func.sum(medium_expr), 0).label("medium"),
+            )
+            .outerjoin(
+                PassengerScoreModel,
+                TransactionModel.passenger_id == PassengerScoreModel.passenger_id,
+            )
+        )
+        stmt = self._apply_filters(
+            stmt,
             train_no=train_no,
             cashdesk=cashdesk,
             terminal=terminal,
@@ -366,12 +388,18 @@ class TransactionRepositoryImpl(ITransactionRepository, BaseSQLAlchemyRepo):
             date_from=date_from,
             date_to=date_to,
         )
-        stats = {"low": 0, "medium": 0, "high": 0, "critical": 0}
-        for item in scored:
-            band = item["operation_band"]
-            key = band.value if isinstance(band, RiskBand) else str(band)
-            if key in stats:
-                stats[key] += 1
+        row = (await self._session.execute(stmt)).one()
+        critical = int(row.critical or 0)
+        high = int(row.high or 0)
+        medium = int(row.medium or 0)
+        total = int(row.total or 0)
+        suspicious = medium + high + critical
+        stats = {
+            "low": max(total - suspicious, 0),
+            "medium": medium,
+            "high": high,
+            "critical": critical,
+        }
         stats["suspicious"] = stats["medium"] + stats["high"] + stats["critical"]
         stats["high_critical"] = stats["high"] + stats["critical"]
         return stats
@@ -579,13 +607,22 @@ class TransactionRepositoryImpl(ITransactionRepository, BaseSQLAlchemyRepo):
             )
         ]
 
+    @cache_result(ttl=300, cache_key_fn=_dimension_stats_cache_key)
     async def get_dimension_stats_by_passenger_score(self, dimension_column: str) -> list[dict]:
         """Fast concentration stats using persisted passenger final scores."""
         col = getattr(TransactionModel, dimension_column, None)
         if col is None:
             raise ValueError(f"Invalid dimension column: {dimension_column}")
 
-        suspicious_expr = case((PassengerScoreModel.final_score >= 40, 1), else_=0)
+        suspicious_expr = case(
+            (
+                PassengerScoreModel.risk_band.in_(
+                    [RiskBand.medium.value, RiskBand.high.value, RiskBand.critical.value]
+                ),
+                1,
+            ),
+            else_=0,
+        )
         stmt = (
             select(
                 col.label("dim"),

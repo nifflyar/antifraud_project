@@ -20,6 +20,17 @@ type OperationSortBy = "risk_score" | "risk_band" | "final_score" | "date" | "am
 type OperationType = "sale" | "refund" | "redeem" | "other";
 type TerminalSortBy = "risk_ops" | "risk_share" | "lift" | "total_ops" | "name";
 
+function useDebouncedValue<T>(value: T, delay = 350): T {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delay);
+    return () => window.clearTimeout(timer);
+  }, [value, delay]);
+
+  return debounced;
+}
+
 export default function TerminalsPage() {
   const router = useRouter();
   const [terminals, setTerminals] = useState<RiskConcentrationItem[]>([]);
@@ -40,6 +51,7 @@ export default function TerminalsPage() {
   const [sortBy, setSortBy] = useState<OperationSortBy>("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const limit = 25;
+  const debouncedSearch = useDebouncedValue(search, 350);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -52,7 +64,7 @@ export default function TerminalsPage() {
     const fetchTerminals = async () => {
       setLoadingTerminals(true);
       try {
-        const res = await dashboard.riskConcentration("TERMINAL", true);
+        const res = await dashboard.riskConcentration("TERMINAL");
         setTerminals(res.items || []);
       } catch {
         setTerminals([]);
@@ -126,18 +138,20 @@ export default function TerminalsPage() {
       const res = await operations.list({
         terminal: selectedTerminal,
         op_type: opType || undefined,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         date_from: dateFrom || undefined,
         date_to: dateTo || undefined,
         sort_by: sortBy,
         sort_order: sortOrder,
-        include_risk_stats: true,
+        include_risk_stats: page === 1,
         limit,
         offset: (page - 1) * limit,
       });
       setItems(res.items || []);
       setTotal(res.total || 0);
-      setOperationRiskStats(res.risk_stats ?? null);
+      if (res.risk_stats) {
+        setOperationRiskStats(res.risk_stats);
+      }
     } catch {
       setItems([]);
       setTotal(0);
@@ -145,7 +159,7 @@ export default function TerminalsPage() {
     } finally {
       setLoadingOps(false);
     }
-  }, [selectedTerminal, opType, search, dateFrom, dateTo, sortBy, sortOrder, page]);
+  }, [selectedTerminal, opType, debouncedSearch, dateFrom, dateTo, sortBy, sortOrder, page]);
 
   useEffect(() => {
     fetchOperations();
