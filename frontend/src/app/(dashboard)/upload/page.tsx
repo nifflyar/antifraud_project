@@ -21,7 +21,28 @@ const normalizeUploadStatus = (status?: string) => (status || "").toLowerCase();
 
 const isUploadInProgress = (status?: string) => {
   const value = normalizeUploadStatus(status);
-  return value === "pending" || value === "processing";
+  return value === "pending" || value === "processing" || value === "scoring";
+};
+
+const uploadStatusLabel = (status?: string) => {
+  switch (normalizeUploadStatus(status)) {
+    case "pending": return "В очереди";
+    case "processing": return "Загрузка данных";
+    case "scoring": return "Скоринг";
+    case "done": return "Готово";
+    case "failed": return "Ошибка";
+    default: return status || "—";
+  }
+};
+
+const scoringStatusLabel = (status?: string) => {
+  switch (normalizeUploadStatus(status)) {
+    case "pending": return "В очереди";
+    case "running": return "Обработка";
+    case "done": return "Завершён";
+    case "failed": return "Ошибка";
+    default: return status || "—";
+  }
 };
 
 const formatFileSize = (bytes: number) => {
@@ -77,13 +98,16 @@ export default function UploadPage() {
 
         const status = normalizeUploadStatus(current.status);
         if (status === "done") {
-          return { ...item, status: "done", message: "Готово: данные загружены" };
+          return { ...item, status: "done", message: "Готово: данные загружены и скоринг завершён" };
         }
         if (status === "failed") {
           return { ...item, status: "failed", message: current.error_message || "Ошибка обработки файла" };
         }
         if (status === "processing") {
           return { ...item, status: "accepted", message: "Обработка строк..." };
+        }
+        if (status === "scoring") {
+          return { ...item, status: "accepted", message: "Автоматический скоринг..." };
         }
         return { ...item, status: "accepted", message: "Файл принят, ожидает обработки" };
       })
@@ -196,14 +220,14 @@ export default function UploadPage() {
       case "accepted": return <Clock size={16} style={{ color: "#f59e0b" }} />;
       case "done": return <CheckCircle2 size={16} style={{ color: "#10b981" }} />;
       case "pending": return <Clock size={16} style={{ color: "#f59e0b" }} />;
-      case "processing": case "running": return <Loader2 size={16} style={{ color: "#3b82f6", animation: "spin 1s linear infinite" }} />;
+      case "processing": case "scoring": case "running": return <Loader2 size={16} style={{ color: "#3b82f6", animation: "spin 1s linear infinite" }} />;
       case "failed": return <AlertTriangle size={16} style={{ color: "#ef4444" }} />;
       default: return <Clock size={16} style={{ color: "var(--text-muted)" }} />;
     }
   };
 
   const completedUploads = uploadList.filter(u => normalizeUploadStatus(u.status) === "done").length;
-  const scoredUploads = Object.keys(scoringJobs).filter(k => scoringJobs[k].status === "done").length;
+  const scoredUploads = completedUploads;
 
   return (
     <div>
@@ -219,7 +243,7 @@ export default function UploadPage() {
         {[
           { label: "Всего загрузок", count: uploadList.length, icon: "📁" },
           { label: "Завершено", count: completedUploads, icon: "✓" },
-          { label: "Обработано", count: scoredUploads, icon: "⚡" },
+          { label: "Скоринг готов", count: scoredUploads, icon: "⚡" },
         ].map((stat, i) => (
           <motion.div
             key={i}
@@ -355,7 +379,7 @@ export default function UploadPage() {
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                           {statusIcon(u.status)}
                           <span style={{ fontSize: "0.8125rem", textTransform: "uppercase", fontWeight: 600 }}>
-                            {uploadStatus === "done" ? "Готово" : uploadStatus === "processing" ? "Обработка" : uploadStatus === "pending" ? "В очереди" : uploadStatus || u.status}
+                            {uploadStatusLabel(u.status)}
                           </span>
                         </div>
                         {uploadStatus === "failed" && u.error_message && (
@@ -383,11 +407,23 @@ export default function UploadPage() {
                           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.8125rem" }}>
                             {statusIcon(job.status)}
                             <span style={{ textTransform: "uppercase", fontWeight: 600 }}>
-                              {job.status === "done" ? "Завершено" : job.status === "running" ? "Обработка" : job.status}
+                              {scoringStatusLabel(job.status)}
                             </span>
                           </div>
+                        ) : uploadStatus === "scoring" ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.8125rem" }}>
+                            {statusIcon("scoring")}
+                            <span style={{ textTransform: "uppercase", fontWeight: 600 }}>Автоскоринг</span>
+                          </div>
+                        ) : uploadStatus === "done" ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.8125rem" }}>
+                            {statusIcon("done")}
+                            <span style={{ textTransform: "uppercase", fontWeight: 600 }}>Автоматически</span>
+                          </div>
+                        ) : uploadStatus === "failed" ? (
+                          <span style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>Не запускался</span>
                         ) : (
-                          <span style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>—</span>
+                          <span style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>После загрузки</span>
                         )}
                       </td>
                       <td style={{ textAlign: "right" }}>
@@ -398,7 +434,7 @@ export default function UploadPage() {
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                           >
-                            <Zap size={14} /> Скорить
+                            <Zap size={14} /> Перескорить
                           </motion.button>
                         )}
                         {isScoring && job.status !== "done" && job.status !== "failed" && (

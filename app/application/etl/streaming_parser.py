@@ -52,7 +52,7 @@ class StreamingExcelParser:
         database writes stay on the normal SQLAlchemy event loop.
         """
         loop = asyncio.get_running_loop()
-        queue: asyncio.Queue[tuple[list, list[str], ParseProgress] | BaseException | object] = asyncio.Queue(maxsize=2)
+        queue: asyncio.Queue[tuple[list, list[str], ParseProgress] | BaseException | object] = asyncio.Queue(maxsize=3)
         sentinel = object()
 
         def emit(item: tuple[list, list[str], ParseProgress] | BaseException | object) -> None:

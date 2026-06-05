@@ -79,6 +79,9 @@ class ITransactionRepository(ABC):
     ) -> int: ...
 
     @abstractmethod
+    async def count_scored_suspicious(self) -> int: ...
+
+    @abstractmethod
     async def count_operations(
         self,
         train_no: str | None = None,
@@ -125,6 +128,9 @@ class ITransactionRepository(ABC):
 
     @abstractmethod
     async def get_dimension_stats(self, dimension_column: str) -> list[dict]: ...
+
+    @abstractmethod
+    async def get_dimension_stats_by_passenger_score(self, dimension_column: str) -> list[dict]: ...
 
     @abstractmethod
     async def get_live_dimension_stats(self, dimension_column: str) -> list[dict]: ...

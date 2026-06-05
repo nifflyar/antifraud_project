@@ -152,9 +152,10 @@ class ProcessScoringResultsInteractor:
         from app.domain.risk.entity import RiskConcentration
         import hashlib, struct
         
-        # Получаем базовую долю подозрительных операций в системе
+        # Fast concentration rebuild: use persisted passenger scores instead of
+        # rescoring operation rows in Python after every upload.
         total_all = await self._tx_repo.count_all()
-        suspicious_all = await self._tx_repo.count_suspicious()
+        suspicious_all = await self._tx_repo.count_scored_suspicious()
         base_share = suspicious_all / total_all if total_all > 0 else 0.0
         
         dimensions = [
@@ -168,7 +169,7 @@ class ProcessScoringResultsInteractor:
         
         for dtype in dimensions:
             # Получаем статистику по колонке
-            stats = await self._tx_repo.get_dimension_stats(dtype.value)
+            stats = await self._tx_repo.get_dimension_stats_by_passenger_score(dtype.value)
             
             for row in stats:
                 val = str(row["value"])

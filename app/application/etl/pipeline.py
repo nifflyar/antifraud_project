@@ -86,7 +86,7 @@ class EtlPipeline:
         upload_repo: IUploadRepository,
         audit_service: AuditService,
         transaction_manager: TransactionManager,
-        batch_size: int = 50000,
+        batch_size: int = 100000,
     ) -> None:
         self._tx_repo = transaction_repo
         self._passenger_repo = passenger_repo

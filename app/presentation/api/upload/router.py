@@ -10,10 +10,13 @@ from dishka.integrations.fastapi import FromDishka, inject
 from dishka import AsyncContainer
 
 from app.application.upload.create_upload import CreateUploadInputDTO, CreateUploadInteractor
+from app.application.common.transaction import TransactionManager
 from app.application.upload.get_upload import GetUploadInputDTO, GetUploadInteractor
 from app.application.upload.list_uploads import ListUploadsInputDTO, ListUploadsInteractor
 from app.application.etl.pipeline import EtlPipeline
 from app.application.scoring.process_results import ProcessScoringResultsInteractor
+from app.domain.upload.repository import IUploadRepository
+from app.domain.upload.vo import UploadId
 from app.infrastructure.config import Config
 from app.presentation.api.security import get_optional_auth_claims_from_request
 from app.presentation.api.upload.schemas import UploadListResponse, UploadResponse
@@ -111,8 +114,23 @@ async def upload_excel(
                             {"status": "scoring", "message": "Запущен скоринг рисков"},
                         )
                         async with root_container() as scoring_container:
+                            upload_repo = await scoring_container.get(IUploadRepository)
+                            tx_manager = await scoring_container.get(TransactionManager)
+                            upload = await upload_repo.get_by_id(UploadId(upload_id))
+                            if upload:
+                                upload.mark_scoring()
+                                await upload_repo.update_upload(upload)
+                                await tx_manager.commit()
+
                             scoring = await scoring_container.get(ProcessScoringResultsInteractor)
                             await scoring.execute(upload_id=upload_id)
+
+                            upload = await upload_repo.get_by_id(UploadId(upload_id))
+                            if upload:
+                                upload.mark_done()
+                                await upload_repo.update_upload(upload)
+                                await tx_manager.commit()
+
                         await progress_manager.broadcast_progress(
                             upload_id,
                             {"status": "scored", "message": "Скоринг завершен"},
@@ -132,6 +150,17 @@ async def upload_excel(
                                 "message": "Данные загружены, но скоринг не завершился",
                             },
                         )
+                        try:
+                            async with root_container() as status_container:
+                                upload_repo = await status_container.get(IUploadRepository)
+                                tx_manager = await status_container.get(TransactionManager)
+                                upload = await upload_repo.get_by_id(UploadId(upload_id))
+                                if upload:
+                                    upload.mark_done()
+                                    await upload_repo.update_upload(upload)
+                                    await tx_manager.commit()
+                        except Exception:
+                            logger.exception("Не удалось вернуть upload_id=%s в DONE после ошибки скоринга", upload_id)
             except Exception as e:
                 logger.exception(f"Критическая ошибка при фоновой обработке файла: {e}")
                 await progress_manager.broadcast_progress(

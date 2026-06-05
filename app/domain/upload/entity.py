@@ -25,9 +25,15 @@ class Upload:
         self.error_message = None
 
     def mark_done(self) -> None:
-        if self.status not in (UploadStatus.PROCESSING, UploadStatus.PENDING):
+        if self.status not in (UploadStatus.PROCESSING, UploadStatus.PENDING, UploadStatus.SCORING, UploadStatus.DONE):
             raise ValueError(f"Cannot complete: status is {self.status}")
         self.status = UploadStatus.DONE
+        self.error_message = None
+
+    def mark_scoring(self) -> None:
+        if self.status not in (UploadStatus.PROCESSING, UploadStatus.DONE):
+            raise ValueError(f"Cannot start scoring: status is {self.status}")
+        self.status = UploadStatus.SCORING
         self.error_message = None
 
     def mark_failed(self, error_message: str | None = None) -> None:

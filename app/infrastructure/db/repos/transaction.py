@@ -1,7 +1,7 @@
 from collections import defaultdict
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from app.domain.passenger.vo import PassengerId, RiskBand
@@ -298,6 +298,19 @@ class TransactionRepositoryImpl(ITransactionRepository, BaseSQLAlchemyRepo):
         )
         return sum(1 for item in scored if item["operation_score"] >= 40)
 
+    async def count_scored_suspicious(self) -> int:
+        """Fast approximate risk count based on saved passenger scores."""
+        stmt = (
+            select(func.count(TransactionModel.id))
+            .join(
+                PassengerScoreModel,
+                TransactionModel.passenger_id == PassengerScoreModel.passenger_id,
+            )
+            .where(PassengerScoreModel.final_score >= 40)
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one() or 0
+
     async def count_operations(
         self,
         train_no: str | None = None,
@@ -423,7 +436,7 @@ class TransactionRepositoryImpl(ITransactionRepository, BaseSQLAlchemyRepo):
         raw_conn = await conn.get_raw_connection()
         driver_conn = raw_conn.driver_connection
 
-        chunk_size = 20000
+        chunk_size = 50000
         for chunk_start in range(0, len(transactions), chunk_size):
             chunk = transactions[chunk_start : chunk_start + chunk_size]
             try:
@@ -564,6 +577,41 @@ class TransactionRepositoryImpl(ITransactionRepository, BaseSQLAlchemyRepo):
             for value, total_count in sorted(
                 totals.items(), key=lambda item: suspicious_counts.get(item[0], 0), reverse=True
             )
+        ]
+
+    async def get_dimension_stats_by_passenger_score(self, dimension_column: str) -> list[dict]:
+        """Fast concentration stats using persisted passenger final scores."""
+        col = getattr(TransactionModel, dimension_column, None)
+        if col is None:
+            raise ValueError(f"Invalid dimension column: {dimension_column}")
+
+        suspicious_expr = case((PassengerScoreModel.final_score >= 40, 1), else_=0)
+        stmt = (
+            select(
+                col.label("dim"),
+                func.count(TransactionModel.id).label("total_count"),
+                func.coalesce(func.sum(suspicious_expr), 0).label("suspicious_count"),
+            )
+            .outerjoin(
+                PassengerScoreModel,
+                TransactionModel.passenger_id == PassengerScoreModel.passenger_id,
+            )
+            .where(col.is_not(None))
+            .group_by(col)
+            .order_by(
+                func.coalesce(func.sum(suspicious_expr), 0).desc(),
+                func.count(TransactionModel.id).desc(),
+            )
+        )
+
+        result = await self._session.execute(stmt)
+        return [
+            {
+                "value": str(row.dim),
+                "total_count": int(row.total_count or 0),
+                "suspicious_count": int(row.suspicious_count or 0),
+            }
+            for row in result.all()
         ]
 
     @cache_result(ttl=300, cache_key_fn=_dimension_stats_cache_key)

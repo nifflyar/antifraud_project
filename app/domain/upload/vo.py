@@ -14,5 +14,6 @@ class UploadId(PositiveInteger):
 class UploadStatus(str, Enum):
     PENDING = "pending"
     PROCESSING = "processing"
+    SCORING = "scoring"
     DONE = "done"
     FAILED = "failed"
