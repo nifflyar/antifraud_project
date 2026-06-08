@@ -23,6 +23,9 @@ class IPassengerRepository(ABC):
     async def count(self, risk_band: RiskBand | None = None, search: str | None = None) -> int: ...
 
     @abstractmethod
+    async def count_risk_bands(self, search: str | None = None) -> dict[str, int]: ...
+
+    @abstractmethod
     async def create_passenger(self, passenger: Passenger) -> None: ...
 
     @abstractmethod

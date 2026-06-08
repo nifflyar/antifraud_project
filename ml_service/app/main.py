@@ -41,7 +41,7 @@ def _safe_float(value: Any) -> float:
 
 
 def _load_transactions(upload_id: int | None) -> pd.DataFrame:
-    query = """
+    base_select = """
         SELECT
           t.*,
           p.fio_clean,
@@ -51,8 +51,28 @@ def _load_transactions(upload_id: int | None) -> pd.DataFrame:
     """
     params = None
     if upload_id is not None:
-        query += " WHERE t.upload_id = %(upload_id)s"
+        # upload_id defines which passengers were touched by the new file.
+        # Scores are calculated from each touched passenger's full transaction
+        # history, so a new monthly report cannot overwrite an existing
+        # passenger's score with a partial one-file snapshot.
+        query = """
+            WITH touched_passengers AS (
+                SELECT DISTINCT passenger_id
+                FROM transactions
+                WHERE upload_id = %(upload_id)s
+                  AND passenger_id IS NOT NULL
+            )
+            SELECT
+              t.*,
+              p.fio_clean,
+              p.fake_fio_score AS fio_fake_score
+            FROM transactions t
+            JOIN touched_passengers tp ON tp.passenger_id = t.passenger_id
+            LEFT JOIN passengers p ON p.id = t.passenger_id
+        """
         params = {"upload_id": upload_id}
+    else:
+        query = base_select
     with engine.connect() as conn:
         df = pd.read_sql(query, conn, params=params)
 

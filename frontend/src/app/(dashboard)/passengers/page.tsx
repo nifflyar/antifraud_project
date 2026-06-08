@@ -10,6 +10,17 @@ import { motion, AnimatePresence } from "framer-motion";
 
 type PassengerSortBy = "final_score" | "risk_score" | "risk_band" | "date" | "fake_fio" | "name";
 
+function useDebouncedValue<T>(value: T, delay = 350): T {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delay);
+    return () => window.clearTimeout(timer);
+  }, [value, delay]);
+
+  return debounced;
+}
+
 export default function PassengersPage() {
   const router = useRouter();
   const [items, setItems] = useState<PassengerListItem[]>([]);
@@ -23,10 +34,11 @@ export default function PassengersPage() {
   const [riskCounts, setRiskCounts] = useState({ critical: 0, high: 0, medium: 0, low: 0, unscored: 0, total: 0 });
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const limit = 20;
+  const debouncedSearch = useDebouncedValue(search, 350);
 
   const fetchRiskStats = useCallback(async () => {
     try {
-      const stats = await passengers.getRiskStats(search || undefined);
+      const stats = await passengers.getRiskStats(debouncedSearch || undefined);
       setRiskCounts({
         critical: stats.critical ?? 0,
         high: stats.high ?? 0,
@@ -39,14 +51,14 @@ export default function PassengersPage() {
       console.error("Fetch risk stats error:", err);
       setRiskCounts({ critical: 0, high: 0, medium: 0, low: 0, unscored: 0, total: 0 });
     }
-  }, [search]);
+  }, [debouncedSearch]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await passengers.list({
         risk_band: riskFilter || undefined,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         sort_by: sortBy,
         sort_order: sortOrder,
         limit,
@@ -61,7 +73,7 @@ export default function PassengersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, riskFilter, search, sortBy, sortOrder]);
+  }, [page, riskFilter, debouncedSearch, sortBy, sortOrder]);
 
   useEffect(() => {
     fetchRiskStats();

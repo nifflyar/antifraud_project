@@ -16,23 +16,13 @@ class GetPassengerRiskStatsInteractor:
         self._repo = repository
 
     async def execute(self, search: str | None = None) -> PassengerRiskStats:
-        critical = await self._repo.count(risk_band=RiskBand.critical, search=search)
-        high = await self._repo.count(risk_band=RiskBand.high, search=search)
-        medium = await self._repo.count(risk_band=RiskBand.medium, search=search)
-        low = await self._repo.count(risk_band=RiskBand.low, search=search)
-
-        # Получить общее количество пассажиров (с фильтром поиска, но БЕЗ фильтра по risk_band)
-        total_passengers = await self._repo.count(risk_band=None, search=search)
-
-        # Пассажиры БЕЗ оценок риска
-        unscored = total_passengers - (critical + high + medium + low)
-        total = total_passengers
+        counts = await self._repo.count_risk_bands(search=search)
 
         return PassengerRiskStats(
-            critical=critical,
-            high=high,
-            medium=medium,
-            low=low,
-            unscored=unscored,
-            total=total
+            critical=counts.get(RiskBand.critical.value, 0),
+            high=counts.get(RiskBand.high.value, 0),
+            medium=counts.get(RiskBand.medium.value, 0),
+            low=counts.get(RiskBand.low.value, 0),
+            unscored=counts.get("unscored", 0),
+            total=counts.get("total", 0),
         )

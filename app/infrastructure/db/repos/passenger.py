@@ -1,7 +1,7 @@
 import re
 from collections import Counter
 
-from sqlalchemy import String, case, cast, func, or_, select, update
+from sqlalchemy import String, case, cast, func, nullslast, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from app.domain.passenger.entity import Passenger, PassengerIdentitySummary
@@ -14,6 +14,13 @@ from app.infrastructure.db.models.passenger import PassengerModel
 from app.infrastructure.db.models.passenger_scores import PassengerScoreModel
 from app.infrastructure.db.models.transaction import TransactionModel
 from app.infrastructure.db.repos.base import BaseSQLAlchemyRepo
+
+
+_CONFUSABLE_SOURCE = "АВЕКМНОРСТУХІ"
+_CONFUSABLE_TARGET = "ABEKMHOPCTYXI"
+_CONFUSABLE_TRANSLATION = str.maketrans(
+    {source: target for source, target in zip(_CONFUSABLE_SOURCE, _CONFUSABLE_TARGET)}
+)
 
 
 class PassengerRepositoryImpl(IPassengerRepository, BaseSQLAlchemyRepo):
@@ -157,6 +164,42 @@ class PassengerRepositoryImpl(IPassengerRepository, BaseSQLAlchemyRepo):
 
         result = await self._session.execute(stmt)
         return result.scalar_one() or 0
+
+    async def count_risk_bands(self, search: str | None = None) -> dict[str, int]:
+        """Count all risk bands with one query instead of five list-screen scans."""
+        stmt = (
+            select(
+                PassengerScoreModel.risk_band,
+                func.count(PassengerModel.id).label("count"),
+            )
+            .select_from(PassengerModel)
+            .join(
+                PassengerScoreModel,
+                PassengerModel.id == PassengerScoreModel.passenger_id,
+                isouter=True,
+            )
+        )
+        stmt = self._apply_search(stmt, search)
+        stmt = stmt.group_by(PassengerScoreModel.risk_band)
+
+        result = await self._session.execute(stmt)
+        counts = {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0,
+            "unscored": 0,
+            "total": 0,
+        }
+        for band, count in result.all():
+            key = band.value if hasattr(band, "value") else band
+            if key in counts:
+                counts[key] = int(count or 0)
+            else:
+                counts["unscored"] += int(count or 0)
+
+        counts["total"] = counts["critical"] + counts["high"] + counts["medium"] + counts["low"] + counts["unscored"]
+        return counts
 
     async def count_by_date_range(self, date_from, date_to) -> int:
         from datetime import datetime
@@ -305,8 +348,8 @@ class PassengerRepositoryImpl(IPassengerRepository, BaseSQLAlchemyRepo):
             order_exprs = [score_expr, risk_rank, PassengerModel.last_seen_at, PassengerModel.id]
 
         if descending:
-            return stmt.order_by(*(expr.desc() for expr in order_exprs))
-        return stmt.order_by(*(expr.asc() for expr in order_exprs))
+            return stmt.order_by(*(nullslast(expr.desc()) for expr in order_exprs))
+        return stmt.order_by(*(nullslast(expr.asc()) for expr in order_exprs))
 
     @staticmethod
     def _apply_search(stmt, search: str | None):
@@ -318,11 +361,16 @@ class PassengerRepositoryImpl(IPassengerRepository, BaseSQLAlchemyRepo):
             return stmt
 
         plain = raw.lstrip("#").strip()
-        fio_like = f"%{re.sub(r'[=]+', ' ', raw)}%"
+        fio_text = re.sub(r"[=]+", " ", raw)
+        fio_like = f"%{fio_text}%"
         raw_like = f"%{raw}%"
         plain_like = f"%{plain or raw}%"
         digits = re.sub(r"\D+", "", raw)
         digit_like = f"%{digits}%"
+        text_chars = re.sub(r"[^0-9A-Za-zА-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүІіҺһ]+", "", plain)
+        is_short_text_search = bool(text_chars) and not digits and len(text_chars) < 2
+        fio_skeleton = _search_skeleton(fio_text)
+        fio_skeleton_like = f"%{fio_skeleton}%" if fio_skeleton else None
 
         if plain.isdigit() and len(plain) >= 16:
             try:
@@ -330,31 +378,33 @@ class PassengerRepositoryImpl(IPassengerRepository, BaseSQLAlchemyRepo):
             except ValueError:
                 pass
 
-        tx_conditions = [
-            TransactionModel.iin.ilike(raw_like),
-            TransactionModel.doc_no.ilike(raw_like),
-            TransactionModel.phone.ilike(raw_like),
-            TransactionModel.ticket_no.ilike(raw_like),
-            TransactionModel.order_no.ilike(raw_like),
-            TransactionModel.iin.ilike(plain_like),
-            TransactionModel.doc_no.ilike(plain_like),
-            TransactionModel.phone.ilike(plain_like),
-        ]
-        if digit_like != "%%":
-            tx_conditions.extend(
-                [
-                    TransactionModel.iin.ilike(digit_like),
-                    TransactionModel.phone.ilike(digit_like),
-                    TransactionModel.doc_no.ilike(digit_like),
-                ]
-            )
+        tx_match = None
+        if not is_short_text_search:
+            tx_conditions = [
+                TransactionModel.iin.ilike(raw_like),
+                TransactionModel.doc_no.ilike(raw_like),
+                TransactionModel.phone.ilike(raw_like),
+                TransactionModel.ticket_no.ilike(raw_like),
+                TransactionModel.order_no.ilike(raw_like),
+                TransactionModel.iin.ilike(plain_like),
+                TransactionModel.doc_no.ilike(plain_like),
+                TransactionModel.phone.ilike(plain_like),
+            ]
+            if digit_like != "%%":
+                tx_conditions.extend(
+                    [
+                        TransactionModel.iin.ilike(digit_like),
+                        TransactionModel.phone.ilike(digit_like),
+                        TransactionModel.doc_no.ilike(digit_like),
+                    ]
+                )
 
-        tx_match = (
-            select(TransactionModel.id)
-            .where(TransactionModel.passenger_id == PassengerModel.id)
-            .where(or_(*tx_conditions))
-            .exists()
-        )
+            tx_match = (
+                select(TransactionModel.id)
+                .where(TransactionModel.passenger_id == PassengerModel.id)
+                .where(or_(*tx_conditions))
+                .exists()
+            )
 
         direct_id_conditions = []
         if plain.isdigit():
@@ -363,15 +413,23 @@ class PassengerRepositoryImpl(IPassengerRepository, BaseSQLAlchemyRepo):
             except ValueError:
                 pass
 
-        return stmt.where(
-            or_(
-                *direct_id_conditions,
-                PassengerModel.fio_clean.ilike(fio_like),
-                PassengerModel.fio_clean.ilike(raw_like),
-                cast(PassengerModel.id, String).ilike(plain_like),
-                tx_match,
-            )
+        fio_skeleton_expr = func.translate(
+            func.upper(PassengerModel.fio_clean),
+            _CONFUSABLE_SOURCE,
+            _CONFUSABLE_TARGET,
         )
+        conditions = [
+            *direct_id_conditions,
+            PassengerModel.fio_clean.ilike(fio_like),
+            PassengerModel.fio_clean.ilike(raw_like),
+            cast(PassengerModel.id, String).ilike(plain_like),
+        ]
+        if fio_skeleton_like:
+            conditions.append(fio_skeleton_expr.like(fio_skeleton_like))
+        if tx_match is not None:
+            conditions.append(tx_match)
+
+        return stmt.where(or_(*conditions))
 
     async def _load_score(self, passenger: Passenger) -> None:
         stmt = select(PassengerScoreModel).where(
@@ -543,3 +601,12 @@ def _top_profile_values(values, limit: int = 5) -> list[str]:
 def _first_profile_value(values) -> str | None:
     top_values = _top_profile_values(values, limit=1)
     return top_values[0] if top_values else None
+
+
+def _search_skeleton(value: str | None) -> str:
+    if not value:
+        return ""
+    text = value.upper().translate(_CONFUSABLE_TRANSLATION)
+    text = re.sub(r"[=]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
