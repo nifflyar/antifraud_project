@@ -19,6 +19,7 @@ import {
   colorSystem,
   typography
 } from '@/components/EnterpriseComponents';
+import { formatAstanaDateTime } from '@/lib/datetime';
 
 export default function Dashboard() {
   // ========================================================================
@@ -346,7 +347,7 @@ export default function Dashboard() {
         {/* ====== FOOTER INFO ====== */}
         <section className="text-center text-neutral-500 py-8 border-t border-neutral-200">
           <p className={`${typography.bodySmall}`}>
-            Last updated: {new Date().toLocaleString()} • ML Model: v2.4.1 • Next sync: in 5 minutes
+            Last updated: {formatAstanaDateTime(new Date())} • ML Model: v2.4.1 • Next sync: in 5 minutes
           </p>
         </section>
       </main>

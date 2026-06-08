@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { dashboard, operations } from "@/lib/api";
+import { formatAstanaDateTime } from "@/lib/datetime";
 import type { RiskConcentrationItem, SuspiciousOperation, SuspiciousOperationsResponse } from "@/types/api";
 import RiskBadge from "@/components/RiskBadge";
 import {
@@ -425,7 +426,7 @@ export default function TerminalsPage() {
                     ) : (
                       items.map((op) => (
                         <tr key={op.id}>
-                          <td style={{ whiteSpace: "nowrap", color: "var(--text-secondary)", fontSize: "0.8125rem" }}>{new Date(op.op_datetime).toLocaleString("ru-RU")}</td>
+                          <td style={{ whiteSpace: "nowrap", color: "var(--text-secondary)", fontSize: "0.8125rem" }}>{formatAstanaDateTime(op.op_datetime)}</td>
                           <td><span style={{ fontWeight: 800, color: op.op_type === "refund" ? "var(--risk-critical)" : "var(--risk-low)" }}>{op.op_type}</span></td>
                           <td className="mono" style={{ fontWeight: 800 }}>{op.operation_risk_score}</td>
                           <td><RiskBadge band={op.risk_band} /></td>

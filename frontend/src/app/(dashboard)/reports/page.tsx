@@ -2,13 +2,9 @@
 
 import React, { useState } from "react";
 import { reports } from "@/lib/api";
+import { ASTANA_TIMEZONE_LABEL, astanaDateInput, astanaDateInputDaysAgo } from "@/lib/datetime";
 import { FileSpreadsheet, FileText, Download, Filter, Calendar, Users } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-const toDateInput = (date: Date) => {
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 10);
-};
 
 export default function ReportsPage() {
   const [passengerIdInput, setPassengerIdInput] = useState("");
@@ -32,11 +28,8 @@ export default function ReportsPage() {
       return;
     }
 
-    const to = new Date();
-    const from = new Date();
-    from.setDate(to.getDate() - days + 1);
-    setDateFrom(toDateInput(from));
-    setDateTo(toDateInput(to));
+    setDateFrom(astanaDateInputDaysAgo(days - 1));
+    setDateTo(astanaDateInput());
   };
 
   const downloadFile = async (type: string, fetcher: () => Promise<Response>, filename: string) => {
@@ -75,7 +68,7 @@ export default function ReportsPage() {
         date_from: dateFrom || undefined,
         date_to: dateTo || undefined,
       }),
-      `suspicious_ops_${new Date().toISOString().slice(0, 10)}.xlsx`
+      `suspicious_ops_${astanaDateInput()}.xlsx`
     );
   };
 
@@ -87,7 +80,7 @@ export default function ReportsPage() {
         risk_band: passengerRiskBand || undefined,
         search: passengerSearch || undefined,
       }),
-      `passengers_${suffix}_${new Date().toISOString().slice(0, 10)}.xlsx`
+      `passengers_${suffix}_${astanaDateInput()}.xlsx`
     );
   };
 
@@ -101,7 +94,7 @@ export default function ReportsPage() {
       description: "Сводный отчёт по концентрации рисков: каналы, терминалы, кассы, агрегаторы.",
       buttonText: "Скачать .xlsx",
       buttonColor: "#3b82f6",
-      onClick: () => downloadFile("concentration", () => reports.concentrationExcel(), `risk_concentration_${new Date().toISOString().slice(0, 10)}.xlsx`),
+      onClick: () => downloadFile("concentration", () => reports.concentrationExcel(), `risk_concentration_${astanaDateInput()}.xlsx`),
     },
   ];
 
@@ -110,7 +103,7 @@ export default function ReportsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Экспорт и отчётность</h1>
-          <p className="page-subtitle">Генерация сводных отчётов для руководства</p>
+          <p className="page-subtitle">Генерация сводных отчётов для руководства · время: {ASTANA_TIMEZONE_LABEL}</p>
         </div>
       </div>
 
@@ -161,7 +154,7 @@ export default function ReportsPage() {
           </div>
           <h3 style={{ marginBottom: 8 }}>Excel Отчёт (Операции)</h3>
           <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: 20, lineHeight: 1.5 }}>
-            Полный список риск-пассажиров с признаками и подозрительными операциями.
+            Полный список подозрительных операций с фильтрами. Все даты в отчёте: {ASTANA_TIMEZONE_LABEL}.
           </p>
 
           <AnimatePresence>

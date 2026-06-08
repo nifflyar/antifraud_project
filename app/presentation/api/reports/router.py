@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Query, Depends, Request, HTTPException
-from fastapi.responses import StreamingResponse
-from dishka.integrations.fastapi import FromDishka, inject
 from datetime import datetime
 from typing import Optional
 import io
 
+from fastapi import APIRouter, Query, Request, HTTPException
+from fastapi.responses import StreamingResponse
+from dishka.integrations.fastapi import FromDishka, inject
+
+from app.application.common.timezone import astana_filename_timestamp
 from app.application.reports.export_suspicious_excel import ExportSuspiciousOperationsExcelInteractor, ExportSuspiciousInput
 from app.application.reports.export_concentration_excel import ExportRiskConcentrationExcelInteractor
 from app.application.reports.export_passenger_pdf import ExportPassengerProfilePdfInteractor
@@ -38,7 +40,7 @@ async def download_suspicious_excel(
     
     file_bytes = await interactor.execute(input_dto)
     
-    filename = f"suspicious_ops_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    filename = f"suspicious_ops_{astana_filename_timestamp()}.xlsx"
     return StreamingResponse(
         io.BytesIO(file_bytes),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -57,7 +59,7 @@ async def download_concentration_excel(
 
     file_bytes = await interactor.execute()
     
-    filename = f"risk_concentration_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    filename = f"risk_concentration_{astana_filename_timestamp()}.xlsx"
     return StreamingResponse(
         io.BytesIO(file_bytes),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -104,7 +106,7 @@ async def download_passengers_excel(
     file_bytes = await interactor.execute(input_dto)
 
     risk_label = risk_band.value if risk_band else "all"
-    filename = f"passengers_{risk_label}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    filename = f"passengers_{risk_label}_{astana_filename_timestamp()}.xlsx"
     return StreamingResponse(
         io.BytesIO(file_bytes),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

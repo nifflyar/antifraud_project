@@ -30,18 +30,26 @@ class ExportSuspiciousOperationsExcelInteractor:
         )
 
         headers = [
-            "ID Транзакции", 
-            "Тип", 
-            "Дата операции", 
-            "Дата отправления", 
-            "Поезд", 
-            "Сумма", 
-            "Канал", 
-            "Маршрут", 
-            "Пассажир (ФИО)", 
-            "Риск-зона",
-            "Оценка операции",
-            "Причины"
+            "ID операции",
+            "Тип операции",
+            "Дата операции (Астана GMT+5)",
+            "Дата отправления (Астана GMT+5)",
+            "Пассажир ID",
+            "Билет",
+            "Заказ",
+            "ФИО",
+            "Поезд",
+            "Маршрут",
+            "Канал",
+            "Агрегатор",
+            "Терминал",
+            "Пункт продажи",
+            "Тариф",
+            "Класс",
+            "Сумма, ₸",
+            "Уровень риска",
+            "Score операции",
+            "Причины риска",
         ]
         
         data = []
@@ -51,17 +59,25 @@ class ExportSuspiciousOperationsExcelInteractor:
                 tx.op_type.value,
                 tx.op_datetime,
                 tx.dep_datetime,
+                tx.passenger_id.value if tx.passenger_id else "",
+                tx.ticket_no or "",
+                tx.order_no or "",
+                tx.fio or "",
                 tx.train_no,
-                tx.amount,
+                tx.route or "",
                 tx.channel,
-                tx.route,
-                tx.fio,
+                tx.aggregator or "",
+                tx.terminal or "",
+                tx.point_of_sale or tx.cashdesk or "",
+                tx.tariff_type or "",
+                tx.service_class or "",
+                tx.amount,
                 risk_band.value.upper(),
                 operation_score,
                 "; ".join(operation_reasons),
             ])
 
-        generator = ExcelReportGenerator(title="Подозрительные трансзакции")
+        generator = ExcelReportGenerator(title="Подозрительные операции")
         generator.write_headers(headers)
         generator.write_rows(data)
         

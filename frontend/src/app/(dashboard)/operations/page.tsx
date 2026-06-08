@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { operations } from "@/lib/api";
+import { astanaDateInput, formatAstanaDateTime } from "@/lib/datetime";
 import type { SuspiciousOperation } from "@/types/api";
 import RiskBadge from "@/components/RiskBadge";
 import { ArrowLeftRight, ChevronLeft, ChevronRight, Filter, X, Search, Calendar, ArrowUpDown } from "lucide-react";
@@ -51,8 +52,8 @@ export default function OperationsPage() {
     const now = new Date();
     const days = period === "week" ? 7 : period === "month" ? 30 : 90;
     const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-    setDateFrom(from.toISOString().slice(0, 10));
-    setDateTo(now.toISOString().slice(0, 10));
+    setDateFrom(astanaDateInput(from));
+    setDateTo(astanaDateInput(now));
     setPage(1);
   };
 
@@ -336,7 +337,7 @@ export default function OperationsPage() {
               ) : (
                 items.map((op) => (
                   <tr key={op.id}>
-                    <td style={{ whiteSpace: "nowrap", color: "var(--text-secondary)", fontSize: "0.8125rem" }}>{new Date(op.op_datetime).toLocaleString("ru-RU")}</td>
+                    <td style={{ whiteSpace: "nowrap", color: "var(--text-secondary)", fontSize: "0.8125rem" }}>{formatAstanaDateTime(op.op_datetime)}</td>
                     <td className="mono" style={{ fontWeight: 800, color: op.operation_risk_score >= 85 ? "var(--risk-critical)" : op.operation_risk_score >= 65 ? "var(--risk-high)" : "var(--risk-medium)" }}>
                       {op.operation_risk_score}
                     </td>

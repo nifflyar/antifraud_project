@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { TrendingUp, AlertTriangle, Users, BarChart3, RefreshCw, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { dashboard, passengers } from '@/lib/api';
+import { formatAstanaDate } from '@/lib/datetime';
 import type { DashboardSummary, RiskStatsResponse, PassengerListItem } from '@/types/api';
 
 export default function DashboardPage() {
@@ -224,7 +225,7 @@ export default function DashboardPage() {
                       </span>
                     </td>
                     <td style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                      {new Date(passenger.last_seen_at).toLocaleDateString('ru-RU')}
+                      {formatAstanaDate(passenger.last_seen_at)}
                     </td>
                   </tr>
                 ))}

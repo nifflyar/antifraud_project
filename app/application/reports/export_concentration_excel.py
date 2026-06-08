@@ -1,6 +1,3 @@
-from dataclasses import dataclass
-from typing import List
-
 from app.domain.risk.repository import IRiskConcentrationRepository
 from app.domain.risk.vo import DimensionType
 from app.application.common.reports import ExcelReportGenerator
@@ -31,7 +28,13 @@ class ExportRiskConcentrationExcelInteractor:
             cell.font = generator.header_font
             cell.fill = generator.header_fill
             
-            headers = ["Значение измерения", "Всего операций", "Подозрительных", "Доля риска (%)", "Лифт"]
+            headers = [
+                "Значение",
+                "Всего операций",
+                "Риск-операций",
+                "Доля риска, %",
+                "Lift vs база, %",
+            ]
             for col_num, h in enumerate(headers, 1):
                 c = generator.ws.cell(row=current_row + 1, column=col_num, value=h)
                 c.font = generator.header_font
@@ -43,8 +46,8 @@ class ExportRiskConcentrationExcelInteractor:
                     c.dimension_value,
                     c.total_ops,
                     c.highrisk_ops,
-                    round(c.share_highrisk_ops, 2),
-                    round(c.lift_vs_base, 2)
+                    round(c.share_highrisk_ops * 100, 2),
+                    round((c.lift_vs_base - 1) * 100, 2),
                 ])
             
             # Manual write since write_rows assumes start at row 2

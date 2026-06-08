@@ -3,7 +3,8 @@ try:
     from fpdf import FPDF
 except ImportError:
     from fpdf2 import FPDF
-from datetime import datetime
+
+from app.application.common.timezone import ASTANA_TZ_LABEL, astana_now, format_astana_datetime
 from app.domain.passenger.repository import IPassengerRepository
 from app.domain.transaction.repository import ITransactionRepository
 from app.domain.passenger.vo import PassengerId
@@ -24,13 +25,6 @@ class ExportPassengerProfilePdfInteractor:
             raise ValueError(f"Passenger with ID {passenger_id} not found")
         
         transactions = await self._transaction_repo.get_by_passenger_id(pid, limit=20)
-
-        # Try to find IIN in transactions if available
-        passenger_iin = "Н/Д"
-        for tx in transactions:
-            if tx.iin:
-                passenger_iin = tx.iin
-                break
 
         # Initialize PDF
         pdf = FPDF()
@@ -62,8 +56,8 @@ class ExportPassengerProfilePdfInteractor:
         pdf.cell(50, 8, "ФИО (нормализовано):", border=0)
         pdf.cell(0, 8, profile.fio_clean or "Н/Д", border=0, ln=True)
         
-        pdf.cell(50, 8, "ИИН:", border=0)
-        pdf.cell(0, 8, passenger_iin, border=0, ln=True)
+        pdf.cell(62, 8, "ИИН/документ/телефон:", border=0)
+        pdf.cell(0, 8, "скрыто", border=0, ln=True)
 
         if profile.score:
             pdf.ln(5)
@@ -91,7 +85,7 @@ class ExportPassengerProfilePdfInteractor:
         # Column widths
         w = [40, 20, 25, 30, 75]
         
-        pdf.cell(w[0], 8, "Дата", 1)
+        pdf.cell(w[0], 8, "Дата GMT+5", 1)
         pdf.cell(w[1], 8, "Тип", 1)
         pdf.cell(w[2], 8, "Поезд", 1)
         pdf.cell(w[3], 8, "Сумма", 1)
@@ -99,7 +93,7 @@ class ExportPassengerProfilePdfInteractor:
 
         pdf.set_font("DejaVu", size=8)
         for tx in transactions:
-            pdf.cell(w[0], 8, tx.op_datetime.strftime("%d.%m.%Y %H:%M"), 1)
+            pdf.cell(w[0], 8, format_astana_datetime(tx.op_datetime), 1)
             pdf.cell(w[1], 8, tx.op_type.value, 1)
             pdf.cell(w[2], 8, tx.train_no or "-", 1)
             pdf.cell(w[3], 8, f"{tx.amount:,.2f}", 1)
@@ -109,7 +103,8 @@ class ExportPassengerProfilePdfInteractor:
         # Footer
         pdf.ln(20)
         pdf.set_font("DejaVu", style="", size=8)
-        pdf.cell(0, 10, f"Отчет сформирован: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}", align="R")
+        generated_at = astana_now().strftime("%d.%m.%Y %H:%M:%S")
+        pdf.cell(0, 10, f"Отчет сформирован: {generated_at} ({ASTANA_TZ_LABEL})", align="R")
 
         pdf_bytes = pdf.output()
         if isinstance(pdf_bytes, str):

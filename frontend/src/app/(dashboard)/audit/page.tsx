@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { audit } from "@/lib/api";
+import { formatAstanaDateTime } from "@/lib/datetime";
 import type { AuditLogItem } from "@/types/api";
 import { useAuth } from "@/lib/auth-context";
 import { ScrollText, ChevronLeft, ChevronRight, Shield, Filter, X, Eye, Clock, User, Tag, Hash } from "lucide-react";
@@ -202,7 +203,7 @@ export default function AuditPage() {
                 items.map((log) => (
                   <tr key={log.id} className="clickable" onClick={() => handleViewDetail(log)}>
                     <td style={{ whiteSpace: "nowrap", fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
-                      {new Date(log.created_at).toLocaleString("ru-RU")}
+                      {formatAstanaDateTime(log.created_at)}
                     </td>
                     <td>
                       <span className="badge" style={{ background: `${actionColor(log.action)}14`, color: actionColor(log.action) }}>
@@ -281,7 +282,7 @@ export default function AuditPage() {
                     <span style={{ color: "var(--text-muted)", fontSize: "0.875rem", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
                       <Clock size={14} /> Время
                     </span>
-                    <span style={{ fontSize: "0.875rem" }}>{new Date(selectedLog.created_at).toLocaleString("ru-RU", { dateStyle: "long", timeStyle: "medium" })}</span>
+                    <span style={{ fontSize: "0.875rem" }}>{formatAstanaDateTime(selectedLog.created_at, { long: true, seconds: true })}</span>
                   </div>
 
                   {/* Action */}

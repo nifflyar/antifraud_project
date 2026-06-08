@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { dashboard, reports } from "@/lib/api";
+import { astanaDateInput, astanaDateInputDaysAgo, formatAstanaShortDate } from "@/lib/datetime";
 import type { DashboardSummary, RiskTrendItem, RiskConcentrationItem } from "@/types/api";
 import KPICard from "@/components/KPICard";
 import LoadingState from "@/components/LoadingState";
@@ -35,12 +36,8 @@ function DownloadButton({
     setLoading(true);
     try {
       const now = new Date();
-      const dateTo = now.toISOString().slice(0, 10);
-      const dateFrom = new Date(
-        now.getTime() - (period === "week" ? 7 : 30) * 24 * 60 * 60 * 1000
-      )
-        .toISOString()
-        .slice(0, 10);
+      const dateTo = astanaDateInput(now);
+      const dateFrom = astanaDateInputDaysAgo(period === "week" ? 6 : 29);
 
       const res = await reports.suspiciousExcel({ date_from: dateFrom, date_to: dateTo });
       if (!res.ok) throw new Error("Download failed");
@@ -97,8 +94,8 @@ export default function DashboardPage() {
     else if (period === "year") daysBack = 365;
 
     const from = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
-    setTrendDateFrom(from.toISOString().slice(0, 10));
-    setTrendDateTo(now.toISOString().slice(0, 10));
+    setTrendDateFrom(astanaDateInput(from));
+    setTrendDateTo(astanaDateInput(now));
   };
 
   const fetchSummaryAndConcentration = useCallback(async () => {
@@ -145,7 +142,7 @@ export default function DashboardPage() {
   }, [fetchTrend]);
 
   const trendData = trend.map((item) => ({
-    date: new Date(item.date).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" }),
+    date: formatAstanaShortDate(item.date),
     highrisk: item.highrisk_ops,
     share: item.share,
     total: item.total_ops,
@@ -454,7 +451,10 @@ export default function DashboardPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} dy={10} />
                 <YAxis tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} dx={-10} unit="%" />
-                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.03)" }} formatter={(v) => [`+${Number(v ?? 0)}%`, "Lift vs base"]} />
+                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.03)" }} formatter={(v) => {
+                  const value = Number(v ?? 0);
+                  return [`${value > 0 ? "+" : ""}${value}%`, "Lift vs base"];
+                }} />
                 <Bar dataKey="lift" fill="url(#gradRed)" radius={[6, 6, 0, 0]} maxBarSize={40} name="Lift vs base" />
               </BarChart>
             </ResponsiveContainer>

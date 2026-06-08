@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { auth, users } from "@/lib/api";
+import { formatAstanaDate, formatAstanaDateTime } from "@/lib/datetime";
 import type { RegisterRequest, UserListItem } from "@/types/api";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -431,10 +432,10 @@ export default function UsersPage() {
                         )}
                       </td>
                       <td style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                        {u.created_at ? new Date(u.created_at).toLocaleDateString("ru-RU") : "—"}
+                        {formatAstanaDate(u.created_at)}
                       </td>
                       <td style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                        {u.last_login_at ? new Date(u.last_login_at).toLocaleString("ru-RU") : "—"}
+                        {formatAstanaDateTime(u.last_login_at)}
                       </td>
                       <td style={{ textAlign: "right" }}>
                         <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>

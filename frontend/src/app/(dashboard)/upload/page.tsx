@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { uploads, scoring } from "@/lib/api";
+import { formatAstanaDateTime } from "@/lib/datetime";
 import type { UploadResponse, ScoringStatusResponse } from "@/types/api";
 import { Upload as UploadIcon, FileSpreadsheet, CheckCircle2, Clock, AlertTriangle, Loader2, Zap, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
@@ -400,7 +401,7 @@ export default function UploadPage() {
                         )}
                       </td>
                       <td style={{ fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
-                        {new Date(u.uploaded_at).toLocaleString("ru-RU", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        {formatAstanaDateTime(u.uploaded_at, { monthShort: true })}
                       </td>
                       <td>
                         {isScoring ? (
