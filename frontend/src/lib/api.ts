@@ -126,13 +126,13 @@ export const users = {
   me: () => request<UserProfile>("/users/me"),
   list: (limit = 20, offset = 0) =>
     request<ListUsersResponse>(`/users?limit=${limit}&offset=${offset}`),
-  getById: (id: number) => request<UserListItem>(`/users/${id}`),
-  update: (id: number, data: UpdateUserRequest) =>
+  getById: (id: string | number) => request<UserListItem>(`/users/${id}`),
+  update: (id: string | number, data: UpdateUserRequest) =>
     request<UserListItem>(`/users/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     }),
-  delete: (id: number) =>
+  delete: (id: string | number) =>
     request<void>(`/users/${id}`, { method: "DELETE" }),
 };
 

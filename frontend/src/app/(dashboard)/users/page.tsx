@@ -170,7 +170,7 @@ export default function UsersPage() {
 
     setSavingId(user.id);
     try {
-      await users.update(Number(user.id), {
+      await users.update(user.id, {
         full_name: fullName,
         role: editForm.role,
         is_admin: editForm.role === "admin",
@@ -211,7 +211,7 @@ export default function UsersPage() {
 
     setDeletingId(user.id);
     try {
-      await users.delete(Number(user.id));
+      await users.delete(user.id);
       setUserList((prev) => prev.filter((item) => item.id !== user.id));
       setTotal((value) => Math.max(0, value - 1));
       setSuccess("Пользователь удалён");
