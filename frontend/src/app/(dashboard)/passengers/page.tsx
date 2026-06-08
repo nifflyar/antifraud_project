@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { passengers } from "@/lib/api";
 import type { PassengerListItem, RiskBand } from "@/types/api";
@@ -9,6 +9,103 @@ import { Users, Search, ChevronLeft, ChevronRight, Eye, TrendingUp } from "lucid
 import { motion, AnimatePresence } from "framer-motion";
 
 type PassengerSortBy = "final_score" | "risk_score" | "risk_band" | "date" | "fake_fio" | "name";
+type RiskCounts = { critical: number; high: number; medium: number; low: number; unscored: number; total: number };
+type PassengerListState = {
+  page: number;
+  riskFilter: RiskBand | "";
+  search: string;
+  sortBy: PassengerSortBy;
+  sortOrder: "asc" | "desc";
+};
+type PassengerListCache = PassengerListState & {
+  items: PassengerListItem[];
+  total: number;
+  riskCounts: RiskCounts;
+  savedAt: number;
+};
+
+const PASSENGER_LIST_CACHE_KEY = "riskguard.passengers.list.v1";
+const PASSENGER_LIST_CACHE_TTL_MS = 10 * 60 * 1000;
+const DEFAULT_RISK_COUNTS: RiskCounts = { critical: 0, high: 0, medium: 0, low: 0, unscored: 0, total: 0 };
+
+function isRiskBand(value: string | null): value is RiskBand {
+  return value === "critical" || value === "high" || value === "medium" || value === "low";
+}
+
+function isSortBy(value: string | null): value is PassengerSortBy {
+  return value === "final_score" || value === "risk_score" || value === "risk_band" || value === "date" || value === "fake_fio" || value === "name";
+}
+
+function isSortOrder(value: string | null): value is "asc" | "desc" {
+  return value === "asc" || value === "desc";
+}
+
+function readStateFromUrl(): PassengerListState {
+  if (typeof window === "undefined") {
+    return { page: 1, riskFilter: "", search: "", sortBy: "risk_band", sortOrder: "desc" };
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const pageParam = Number(params.get("page") || "1");
+  const risk = params.get("risk");
+  const sortBy = params.get("sort_by");
+  const sortOrder = params.get("sort_order");
+
+  return {
+    page: Number.isFinite(pageParam) && pageParam > 0 ? Math.floor(pageParam) : 1,
+    riskFilter: isRiskBand(risk) ? risk : "",
+    search: params.get("search") || "",
+    sortBy: isSortBy(sortBy) ? sortBy : "risk_band",
+    sortOrder: isSortOrder(sortOrder) ? sortOrder : "desc",
+  };
+}
+
+function sameListState(a: PassengerListState, b: PassengerListState): boolean {
+  return a.page === b.page
+    && a.riskFilter === b.riskFilter
+    && a.search === b.search
+    && a.sortBy === b.sortBy
+    && a.sortOrder === b.sortOrder;
+}
+
+function writeStateToUrl(state: PassengerListState): void {
+  if (typeof window === "undefined") return;
+
+  const params = new URLSearchParams();
+  if (state.search.trim()) params.set("search", state.search.trim());
+  if (state.riskFilter) params.set("risk", state.riskFilter);
+  if (state.sortBy !== "risk_band") params.set("sort_by", state.sortBy);
+  if (state.sortOrder !== "desc") params.set("sort_order", state.sortOrder);
+  if (state.page > 1) params.set("page", String(state.page));
+
+  const nextUrl = params.toString() ? `/passengers?${params.toString()}` : "/passengers";
+  if (`${window.location.pathname}${window.location.search}` !== nextUrl) {
+    window.history.replaceState(null, "", nextUrl);
+  }
+}
+
+function readListCache(state: PassengerListState): PassengerListCache | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(PASSENGER_LIST_CACHE_KEY);
+    if (!raw) return null;
+    const cached = JSON.parse(raw) as PassengerListCache;
+    if (!cached.savedAt || Date.now() - cached.savedAt > PASSENGER_LIST_CACHE_TTL_MS) return null;
+    if (!Array.isArray(cached.items) || !sameListState(cached, state)) return null;
+    return cached;
+  } catch {
+    return null;
+  }
+}
+
+function writeListCache(cache: PassengerListCache): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(PASSENGER_LIST_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // Storage can be full or disabled; URL state is still enough to restore filters.
+  }
+}
 
 function useDebouncedValue<T>(value: T, delay = 350): T {
   const [debounced, setDebounced] = useState(value);
@@ -31,12 +128,51 @@ export default function PassengersPage() {
   const [sortBy, setSortBy] = useState<PassengerSortBy>("risk_band");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [loading, setLoading] = useState(true);
-  const [riskCounts, setRiskCounts] = useState({ critical: 0, high: 0, medium: 0, low: 0, unscored: 0, total: 0 });
+  const [riskCounts, setRiskCounts] = useState<RiskCounts>(DEFAULT_RISK_COUNTS);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  const skipNextDataFetchRef = useRef(false);
+  const skipNextStatsFetchRef = useRef(false);
+  const lastLoadedStateRef = useRef<PassengerListState | null>(null);
   const limit = 20;
   const debouncedSearch = useDebouncedValue(search, 350);
 
+  useEffect(() => {
+    const restoredState = readStateFromUrl();
+    const cached = readListCache(restoredState);
+
+    setPage(restoredState.page);
+    setRiskFilter(restoredState.riskFilter);
+    setSearch(restoredState.search);
+    setSortBy(restoredState.sortBy);
+    setSortOrder(restoredState.sortOrder);
+
+    if (cached) {
+      setItems(cached.items);
+      setTotal(cached.total);
+      setRiskCounts(cached.riskCounts || DEFAULT_RISK_COUNTS);
+      setLoading(false);
+      lastLoadedStateRef.current = restoredState;
+      skipNextDataFetchRef.current = true;
+      skipNextStatsFetchRef.current = true;
+    }
+
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    writeStateToUrl({ page, riskFilter, search, sortBy, sortOrder });
+  }, [hydrated, page, riskFilter, search, sortBy, sortOrder]);
+
   const fetchRiskStats = useCallback(async () => {
+    if (!hydrated) return;
+    if (debouncedSearch !== search) return;
+    if (skipNextStatsFetchRef.current) {
+      skipNextStatsFetchRef.current = false;
+      return;
+    }
+
     try {
       const stats = await passengers.getRiskStats(debouncedSearch || undefined);
       setRiskCounts({
@@ -49,12 +185,20 @@ export default function PassengersPage() {
       });
     } catch (err) {
       console.error("Fetch risk stats error:", err);
-      setRiskCounts({ critical: 0, high: 0, medium: 0, low: 0, unscored: 0, total: 0 });
+      setRiskCounts(DEFAULT_RISK_COUNTS);
     }
-  }, [debouncedSearch]);
+  }, [hydrated, search, debouncedSearch]);
 
   const fetchData = useCallback(async () => {
+    if (!hydrated) return;
+    if (debouncedSearch !== search) return;
+    if (skipNextDataFetchRef.current) {
+      skipNextDataFetchRef.current = false;
+      return;
+    }
+
     setLoading(true);
+    const requestedState: PassengerListState = { page, riskFilter, search, sortBy, sortOrder };
     try {
       const res = await passengers.list({
         risk_band: riskFilter || undefined,
@@ -66,14 +210,16 @@ export default function PassengersPage() {
       });
       setItems(res.items || []);
       setTotal(res.total || 0);
+      lastLoadedStateRef.current = requestedState;
     } catch (err) {
       console.error("Fetch error:", err);
       setItems([]);
       setTotal(0);
+      lastLoadedStateRef.current = null;
     } finally {
       setLoading(false);
     }
-  }, [page, riskFilter, debouncedSearch, sortBy, sortOrder]);
+  }, [hydrated, page, riskFilter, search, debouncedSearch, sortBy, sortOrder]);
 
   useEffect(() => {
     fetchRiskStats();
@@ -83,8 +229,26 @@ export default function PassengersPage() {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    if (!hydrated || loading) return;
+    if (debouncedSearch !== search) return;
+    const currentState: PassengerListState = { page, riskFilter, search, sortBy, sortOrder };
+    if (!lastLoadedStateRef.current || !sameListState(lastLoadedStateRef.current, currentState)) return;
+    writeListCache({
+      page,
+      riskFilter,
+      search,
+      sortBy,
+      sortOrder,
+      items,
+      total,
+      riskCounts,
+      savedAt: Date.now(),
+    });
+  }, [hydrated, loading, page, riskFilter, search, debouncedSearch, sortBy, sortOrder, items, total, riskCounts]);
+
   const offset = (page - 1) * limit;
-  const pages = Math.ceil(total / limit);
+  const pages = Math.max(1, Math.ceil(total / limit));
 
   return (
     <div>
