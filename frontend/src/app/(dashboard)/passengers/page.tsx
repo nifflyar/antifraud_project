@@ -25,6 +25,7 @@ type PassengerListCache = PassengerListState & {
 };
 
 const PASSENGER_LIST_CACHE_KEY = "riskguard.passengers.list.v1";
+const PASSENGER_LIST_URL_KEY = "riskguard.passengers.returnUrl.v1";
 const PASSENGER_LIST_CACHE_TTL_MS = 10 * 60 * 1000;
 const DEFAULT_RISK_COUNTS: RiskCounts = { critical: 0, high: 0, medium: 0, low: 0, unscored: 0, total: 0 };
 
@@ -79,6 +80,11 @@ function writeStateToUrl(state: PassengerListState): void {
   if (state.page > 1) params.set("page", String(state.page));
 
   const nextUrl = params.toString() ? `/passengers?${params.toString()}` : "/passengers";
+  try {
+    window.sessionStorage.setItem(PASSENGER_LIST_URL_KEY, nextUrl);
+  } catch {
+    // URL state is still present in the address bar.
+  }
   if (`${window.location.pathname}${window.location.search}` !== nextUrl) {
     window.history.replaceState(null, "", nextUrl);
   }

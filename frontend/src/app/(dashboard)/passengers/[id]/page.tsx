@@ -38,6 +38,45 @@ const riskReasonStyle = (severity: RiskReasonSeverity) => {
   }
 };
 
+const PASSENGER_LIST_URL_KEY = "riskguard.passengers.returnUrl.v1";
+const PASSENGER_LIST_CACHE_KEY = "riskguard.passengers.list.v1";
+const PASSENGER_LIST_CACHE_TTL_MS = 10 * 60 * 1000;
+
+const buildPassengerListUrlFromState = (state: Record<string, unknown>): string => {
+  const params = new URLSearchParams();
+  const search = typeof state.search === "string" ? state.search.trim() : "";
+  const riskFilter = typeof state.riskFilter === "string" ? state.riskFilter : "";
+  const sortBy = typeof state.sortBy === "string" ? state.sortBy : "";
+  const sortOrder = typeof state.sortOrder === "string" ? state.sortOrder : "";
+  const page = typeof state.page === "number" ? state.page : Number(state.page || 1);
+
+  if (search) params.set("search", search);
+  if (riskFilter) params.set("risk", riskFilter);
+  if (sortBy && sortBy !== "risk_band") params.set("sort_by", sortBy);
+  if (sortOrder && sortOrder !== "desc") params.set("sort_order", sortOrder);
+  if (Number.isFinite(page) && page > 1) params.set("page", String(Math.floor(page)));
+
+  return params.toString() ? `/passengers?${params.toString()}` : "/passengers";
+};
+
+const getPassengerListUrl = (): string => {
+  if (typeof window === "undefined") return "/passengers";
+
+  try {
+    const savedUrl = window.sessionStorage.getItem(PASSENGER_LIST_URL_KEY);
+    if (savedUrl?.startsWith("/passengers")) return savedUrl;
+
+    const rawCache = window.sessionStorage.getItem(PASSENGER_LIST_CACHE_KEY);
+    if (!rawCache) return "/passengers";
+    const cached = JSON.parse(rawCache) as Record<string, unknown>;
+    const savedAt = Number(cached.savedAt || 0);
+    if (!savedAt || Date.now() - savedAt > PASSENGER_LIST_CACHE_TTL_MS) return "/passengers";
+    return buildPassengerListUrlFromState(cached);
+  } catch {
+    return "/passengers";
+  }
+};
+
 const formatRiskReason = (reason: string): RiskReasonView => {
   const raw = String(reason || "").trim();
   const lower = raw.toLowerCase();
@@ -181,6 +220,7 @@ export default function PassengerProfilePage() {
   const [overrideBand, setOverrideBand] = useState<RiskBand>("low");
   const [overrideReason, setOverrideReason] = useState("");
   const txLimit = 30;
+  const goBackToPassengerList = () => router.push(getPassengerListUrl());
 
   useEffect(() => {
     if (!id) return;
@@ -248,7 +288,7 @@ export default function PassengerProfilePage() {
       <div className="empty-state" style={{ minHeight: "60vh" }}>
         <div className="empty-state-icon"><AlertTriangle size={28} /></div>
         <p>Пассажир не найден</p>
-        <button className="btn btn-secondary" style={{ marginTop: 16 }} onClick={() => router.push("/passengers")}>
+        <button className="btn btn-secondary" style={{ marginTop: 16 }} onClick={goBackToPassengerList}>
           ← Назад к списку
         </button>
       </div>
@@ -308,7 +348,7 @@ export default function PassengerProfilePage() {
 
   return (
     <div>
-      <button className="btn btn-ghost" style={{ marginBottom: 16 }} onClick={() => router.push("/passengers")}>
+      <button className="btn btn-ghost" style={{ marginBottom: 16 }} onClick={goBackToPassengerList}>
         <ArrowLeft size={16} /> Назад к списку
       </button>
 
