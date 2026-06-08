@@ -137,11 +137,14 @@ export default function PassengersPage() {
   const [riskCounts, setRiskCounts] = useState<RiskCounts>(DEFAULT_RISK_COUNTS);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [hydrated, setHydrated] = useState(false);
-  const skipNextDataFetchRef = useRef(false);
-  const skipNextStatsFetchRef = useRef(false);
   const lastLoadedStateRef = useRef<PassengerListState | null>(null);
+  const visibleResultRef = useRef({ itemsLength: 0, total: 0 });
   const limit = 20;
   const debouncedSearch = useDebouncedValue(search, 350);
+
+  useEffect(() => {
+    visibleResultRef.current = { itemsLength: items.length, total };
+  }, [items.length, total]);
 
   useEffect(() => {
     const restoredState = readStateFromUrl();
@@ -159,8 +162,6 @@ export default function PassengersPage() {
       setRiskCounts(cached.riskCounts || DEFAULT_RISK_COUNTS);
       setLoading(false);
       lastLoadedStateRef.current = restoredState;
-      skipNextDataFetchRef.current = true;
-      skipNextStatsFetchRef.current = true;
     }
 
     setHydrated(true);
@@ -174,10 +175,6 @@ export default function PassengersPage() {
   const fetchRiskStats = useCallback(async () => {
     if (!hydrated) return;
     if (debouncedSearch !== search) return;
-    if (skipNextStatsFetchRef.current) {
-      skipNextStatsFetchRef.current = false;
-      return;
-    }
 
     try {
       const stats = await passengers.getRiskStats(debouncedSearch || undefined);
@@ -198,13 +195,14 @@ export default function PassengersPage() {
   const fetchData = useCallback(async () => {
     if (!hydrated) return;
     if (debouncedSearch !== search) return;
-    if (skipNextDataFetchRef.current) {
-      skipNextDataFetchRef.current = false;
-      return;
-    }
 
-    setLoading(true);
     const requestedState: PassengerListState = { page, riskFilter, search, sortBy, sortOrder };
+    const hasWarmCache = Boolean(
+      lastLoadedStateRef.current
+      && sameListState(lastLoadedStateRef.current, requestedState)
+      && (visibleResultRef.current.itemsLength > 0 || visibleResultRef.current.total > 0)
+    );
+    setLoading(!hasWarmCache);
     try {
       const res = await passengers.list({
         risk_band: riskFilter || undefined,

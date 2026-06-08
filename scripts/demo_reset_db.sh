@@ -17,7 +17,8 @@ Usage:
 
 Clears demo/business data from the local Docker Postgres database while keeping users.
 Tables cleared: uploads, transactions, passengers, passenger_features,
-passenger_scores, scoring_jobs, risk_concentrations, audit_logs, refresh_sessions.
+passenger_scores, scoring_jobs, risk_concentrations, materialized statistics,
+audit_logs, refresh_sessions. Redis API cache is also cleared.
 EOF
       exit 0
       ;;
@@ -63,6 +64,8 @@ TRUNCATE TABLE
   refresh_sessions,
   audit_logs,
   risk_concentrations,
+  passenger_statistics,
+  transaction_statistics,
   scoring_jobs,
   passenger_scores,
   passenger_features,
@@ -72,10 +75,24 @@ TRUNCATE TABLE
 RESTART IDENTITY CASCADE;
 SQL
 
+if "${DOCKER_COMPOSE[@]}" ps --services | grep -qx redis; then
+  "${DOCKER_COMPOSE[@]}" exec -T redis redis-cli FLUSHDB >/dev/null || true
+  echo "Redis API cache cleared."
+fi
+
 echo "Database demo data cleared."
 "${DOCKER_COMPOSE[@]}" exec -T postgres sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
 select '\''uploads'\'' as table_name, count(*) from uploads
 union all select '\''transactions'\'', count(*) from transactions
 union all select '\''passengers'\'', count(*) from passengers
-union all select '\''passenger_scores'\'', count(*) from passenger_scores;
+union all select '\''passenger_scores'\'', count(*) from passenger_scores
+union all select '\''passenger_features'\'', count(*) from passenger_features
+union all select '\''risk_concentrations'\'', count(*) from risk_concentrations
+union all select '\''passenger_statistics'\'', count(*) from passenger_statistics
+union all select '\''transaction_statistics'\'', count(*) from transaction_statistics;
 "'
+
+cat <<'EOF'
+If an already opened browser tab still shows old passengers, refresh it once.
+The UI keeps the last passenger list in browser sessionStorage for fast back navigation.
+EOF
