@@ -51,6 +51,7 @@ async def register_user_handler(
             full_name=data.full_name,
             actor_user_id=actor_user_id,
             is_admin=data.is_admin,
+            role=data.role,
         )
     )
 
@@ -61,7 +62,7 @@ async def register_user_handler(
         entity_type="user",
         entity_id=register_result.email,
         user_id=creator_id,
-        meta={"email": register_result.email, "is_admin": data.is_admin},
+        meta={"email": register_result.email, "is_admin": data.is_admin, "role": data.role},
     )
     await transaction_manager.commit()
 

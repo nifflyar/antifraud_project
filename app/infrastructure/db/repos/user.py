@@ -28,10 +28,15 @@ class UserRepositoryImpl(IUserRepository, BaseSQLAlchemyRepo):
         return bool(result.scalar() or 0)
 
     async def get_all(self, limit: int = 20, offset: int = 0) -> list[User]:
-        stmt = select(UserModel).limit(limit).offset(offset)
+        stmt = select(UserModel).order_by(UserModel.created_at.desc(), UserModel.email.asc()).limit(limit).offset(offset)
         result = await self._session.execute(stmt)
         user_models = result.scalars().all()
         return [UserMapper.to_domain(model) for model in user_models]
+
+    async def count_all(self) -> int:
+        stmt = select(func.count()).select_from(UserModel)
+        result = await self._session.execute(stmt)
+        return result.scalar() or 0
 
     async def create_user(self, user: User) -> User:
         user_model = UserMapper.to_model(user)
@@ -61,5 +66,15 @@ class UserRepositoryImpl(IUserRepository, BaseSQLAlchemyRepo):
     async def count_admins(self) -> int:
         """Count total number of admin users using efficient SQL query"""
         stmt = select(func.count()).select_from(UserModel).where(UserModel.is_admin == True)
+        result = await self._session.execute(stmt)
+        return result.scalar() or 0
+
+    async def count_active_admins(self) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(UserModel)
+            .where(UserModel.is_admin == True)
+            .where(UserModel.is_active == True)
+        )
         result = await self._session.execute(stmt)
         return result.scalar() or 0

@@ -22,6 +22,7 @@ class RegisterInputDTO:
     full_name: str
     actor_user_id: UserId | None
     is_admin: bool = False
+    role: str | None = None
 
 
 @dataclass
@@ -43,7 +44,9 @@ class RegisterInteractor(Interactor[RegisterInputDTO, RegisterOutputDTO]):
 
     async def __call__(self, data: RegisterInputDTO) -> RegisterOutputDTO:
         email = Email(data.email)
-        full_name = data.full_name
+        full_name = data.full_name.strip()
+        if not full_name:
+            raise ValidationError("Full name is required")
 
         if len(data.password) < 8:
             raise ValidationError("Password must be at least 8 characters long")
@@ -60,6 +63,16 @@ class RegisterInteractor(Interactor[RegisterInputDTO, RegisterOutputDTO]):
                 raise ValidationError("Only admins can register users")
             created_is_admin = data.is_admin
 
+        try:
+            created_role = UserRole(data.role or (UserRole.ADMIN.value if created_is_admin else UserRole.ANALYST.value))
+        except ValueError as exc:
+            raise ValidationError("Invalid user role") from exc
+        if created_role == UserRole.ADMIN:
+            created_is_admin = True
+        elif data.is_admin:
+            created_role = UserRole.ADMIN
+            created_is_admin = True
+
         existing_user = await self.user_repository.get_by_email(email)
         if existing_user is not None:
             raise ValidationError("Email already registered")
@@ -70,8 +83,8 @@ class RegisterInteractor(Interactor[RegisterInputDTO, RegisterOutputDTO]):
             id=UserId(secrets.randbelow(2**63 - 1) + 1),
             email=email,
             password_hash=password_hash,
-            full_name=data.full_name,
-            role=UserRole.ANALYST,
+            full_name=full_name,
+            role=created_role,
             is_admin=created_is_admin,
             created_at=now,
             updated_at=now,

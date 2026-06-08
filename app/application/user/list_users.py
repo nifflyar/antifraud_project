@@ -42,6 +42,7 @@ class ListUsersInteractor(Interactor[ListUsersInputDTO, ListUsersOutputDTO]):
             data.limit = 1
 
         users = await self.user_repository.get_all(limit=data.limit, offset=data.offset)
+        total = await self.user_repository.count_all()
 
         # Convert to output DTOs
         output_users = [
@@ -60,7 +61,7 @@ class ListUsersInteractor(Interactor[ListUsersInputDTO, ListUsersOutputDTO]):
 
         return ListUsersOutputDTO(
             users=output_users,
-            total=len(users),
+            total=total,
             limit=data.limit,
             offset=data.offset,
         )

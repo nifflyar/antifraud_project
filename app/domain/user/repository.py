@@ -17,6 +17,9 @@ class IUserRepository(ABC):
     async def get_all(self, limit: int = 20, offset: int = 0) -> list[User]: ...
 
     @abstractmethod
+    async def count_all(self) -> int: ...
+
+    @abstractmethod
     async def update_user(self, user: User) -> User: ...
 
     @abstractmethod
@@ -27,3 +30,6 @@ class IUserRepository(ABC):
 
     @abstractmethod
     async def count_admins(self) -> int: ...
+
+    @abstractmethod
+    async def count_active_admins(self) -> int: ...

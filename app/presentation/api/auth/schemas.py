@@ -6,6 +6,7 @@ class RegisterRequest(BaseModel):
     password: str
     full_name: str
     is_admin: bool = False
+    role: str | None = None
 
 
 class LoginRequest(BaseModel):

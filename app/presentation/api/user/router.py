@@ -41,6 +41,8 @@ logger = logging.getLogger(__name__)
 class UpdateUserRequest(BaseModel):
     full_name: str | None = None
     is_admin: bool | None = None
+    role: str | None = None
+    is_active: bool | None = None
 
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -142,6 +144,8 @@ async def update_user(
                 actor_user_id=claims.user_id if claims else None,
                 full_name=data.full_name,
                 is_admin=data.is_admin,
+                role=data.role,
+                is_active=data.is_active,
             )
         )
         await transaction_manager.commit()

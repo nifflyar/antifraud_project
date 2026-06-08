@@ -27,6 +27,8 @@ class DeleteUserInteractor(Interactor[DeleteUserInputDTO, None]):
         actor = await self.user_repository.get_by_id(data.actor_user_id)
         if not actor or not actor.is_admin:
             raise ValidationError("Only admins can delete users")
+        if data.actor_user_id.value == data.user_id.value:
+            raise ValidationError("You cannot delete your own account")
 
         user = await self.user_repository.get_by_id(data.user_id)
         if not user:
@@ -35,9 +37,9 @@ class DeleteUserInteractor(Interactor[DeleteUserInputDTO, None]):
         # Prevent deletion of the last admin
         if user.is_admin:
             # Count remaining admins using efficient SQL query
-            admin_count = await self.user_repository.count_admins()
+            admin_count = await self.user_repository.count_active_admins()
             if admin_count <= 1:
-                raise ValidationError("Cannot delete the last admin user")
+                raise ValidationError("Cannot delete the last active admin user")
 
         # Delete user
         await self.user_repository.delete_user(data.user_id)

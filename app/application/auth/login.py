@@ -7,7 +7,7 @@ from app.application.common.transaction import TransactionManager
 from app.application.interfaces.auth import AuthService
 from app.domain.auth import RefreshSession, RefreshSessionRepository
 from app.domain.user.repository import IUserRepository
-from app.domain.user.vo import Email
+from app.domain.user.vo import Email, UserRole
 
 
 @dataclass
@@ -47,12 +47,15 @@ class LoginInteractor(Interactor[LoginInputDTO, LoginOutputDTO]):
 
         if not self.auth_service.verify_password(data.password, user.password_hash.value):
             raise InvalidAuthDataError("Invalid credentials")
+        if not user.is_active:
+            raise InvalidAuthDataError("User account is inactive")
 
         now = datetime.now(UTC)
-        should_be_admin = user.email.value in self.admin_emails
+        should_be_admin = user.is_admin or user.email.value in self.admin_emails
         updated_user = replace(
             user,
             is_admin=should_be_admin,
+            role=UserRole.ADMIN if should_be_admin else user.role,
             updated_at=now,
             last_login_at=now,
         )
