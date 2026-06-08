@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { passengers as passApi } from "@/lib/api";
-import { formatAstanaDate, formatAstanaDateTime } from "@/lib/datetime";
+import { formatSourceDate, formatSourceDateTime } from "@/lib/datetime";
 import type { PassengerProfile, PassengerTransaction, RiskBand } from "@/types/api";
 import RiskBadge from "@/components/RiskBadge";
 import { useAuth } from "@/lib/auth-context";
@@ -328,7 +328,7 @@ export default function PassengerProfilePage() {
     if (!values || values.length === 0) return "—";
     return values.slice(0, 4).join(", ");
   };
-  const formatDateTime = (value?: string | null) => formatAstanaDateTime(value);
+  const formatDateTime = (value?: string | null) => formatSourceDateTime(value);
   const identityHasConflicts = Boolean(
     identity && (
       identity.distinct_iin_count > 1 ||
@@ -351,7 +351,7 @@ export default function PassengerProfilePage() {
             <h1 style={{ fontSize: "1.75rem", fontWeight: 800 }}>Пассажир: #{profile.id}</h1>
             <p style={{ color: "var(--text-secondary)", fontSize: "1.125rem", marginTop: 4 }}>ФИО: {profile.fio_clean}</p>
             <p style={{ color: "var(--text-muted)", fontSize: "0.8125rem", marginTop: 4 }}>
-              Fake FIO Score: <span className="mono">{profile.fake_fio_score.toFixed(3)}</span> · Первая активность: {formatAstanaDate(profile.first_seen_at)}
+              Fake FIO Score: <span className="mono">{profile.fake_fio_score.toFixed(3)}</span> · Первая активность: {formatSourceDate(profile.first_seen_at)}
             </p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -607,7 +607,7 @@ export default function PassengerProfilePage() {
                 ) : (
                   txs.map((tx) => (
                     <tr key={tx.id}>
-                      <td style={{ fontSize: "0.8125rem", color: "var(--text-secondary)" }}>{formatAstanaDateTime(tx.op_datetime)}</td>
+                      <td style={{ fontSize: "0.8125rem", color: "var(--text-secondary)" }}>{formatSourceDateTime(tx.op_datetime)}</td>
                       <td>
                         <span style={{ fontWeight: 700, color: tx.op_type === "refund" ? "var(--risk-critical)" : "var(--risk-low)", textTransform: "uppercase", fontSize: "0.75rem" }}>
                           {tx.op_type}

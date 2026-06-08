@@ -4,7 +4,7 @@ try:
 except ImportError:
     from fpdf2 import FPDF
 
-from app.application.common.timezone import ASTANA_TZ_LABEL, astana_now, format_astana_datetime
+from app.application.common.timezone import ASTANA_TZ_LABEL, astana_now, format_source_datetime
 from app.domain.passenger.repository import IPassengerRepository
 from app.domain.transaction.repository import ITransactionRepository
 from app.domain.passenger.vo import PassengerId
@@ -85,7 +85,7 @@ class ExportPassengerProfilePdfInteractor:
         # Column widths
         w = [40, 20, 25, 30, 75]
         
-        pdf.cell(w[0], 8, "Дата GMT+5", 1)
+        pdf.cell(w[0], 8, "Дата", 1)
         pdf.cell(w[1], 8, "Тип", 1)
         pdf.cell(w[2], 8, "Поезд", 1)
         pdf.cell(w[3], 8, "Сумма", 1)
@@ -93,7 +93,7 @@ class ExportPassengerProfilePdfInteractor:
 
         pdf.set_font("DejaVu", size=8)
         for tx in transactions:
-            pdf.cell(w[0], 8, format_astana_datetime(tx.op_datetime), 1)
+            pdf.cell(w[0], 8, format_source_datetime(tx.op_datetime), 1)
             pdf.cell(w[1], 8, tx.op_type.value, 1)
             pdf.cell(w[2], 8, tx.train_no or "-", 1)
             pdf.cell(w[3], 8, f"{tx.amount:,.2f}", 1)

@@ -103,7 +103,7 @@ export default function ReportsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Экспорт и отчётность</h1>
-          <p className="page-subtitle">Генерация сводных отчётов для руководства · время: {ASTANA_TIMEZONE_LABEL}</p>
+          <p className="page-subtitle">Генерация сводных отчётов для руководства · служебное время: {ASTANA_TIMEZONE_LABEL}</p>
         </div>
       </div>
 
@@ -154,7 +154,7 @@ export default function ReportsPage() {
           </div>
           <h3 style={{ marginBottom: 8 }}>Excel Отчёт (Операции)</h3>
           <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: 20, lineHeight: 1.5 }}>
-            Полный список подозрительных операций с фильтрами. Все даты в отчёте: {ASTANA_TIMEZONE_LABEL}.
+            Полный список подозрительных операций с фильтрами. Даты операций берутся из Excel без дополнительного сдвига.
           </p>
 
           <AnimatePresence>

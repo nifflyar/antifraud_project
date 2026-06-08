@@ -54,6 +54,7 @@ class UserRepositoryImpl(IUserRepository, BaseSQLAlchemyRepo):
                 is_active=user.is_active,
                 role=user.role,
                 updated_at=user.updated_at,
+                last_login_at=user.last_login_at,
             )
         )
         await self._session.execute(stmt)

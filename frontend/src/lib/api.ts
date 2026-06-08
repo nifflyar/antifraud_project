@@ -22,16 +22,17 @@ import type {
   AuditLogItem,
   RiskBand,
 } from "@/types/api";
-import { astanaEndOfDayParam, astanaStartOfDayParam } from "@/lib/datetime";
 
 const BASE = "/api";
 
 function dateStartParam(value?: string): string | undefined {
-  return astanaStartOfDayParam(value);
+  if (!value) return undefined;
+  return value.includes("T") ? value : `${value}T00:00:00`;
 }
 
 function dateEndParam(value?: string): string | undefined {
-  return astanaEndOfDayParam(value);
+  if (!value) return undefined;
+  return value.includes("T") ? value : `${value}T23:59:59`;
 }
 
 class ApiError extends Error {

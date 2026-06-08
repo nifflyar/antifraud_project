@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { dashboard, reports } from "@/lib/api";
-import { astanaDateInput, astanaDateInputDaysAgo, formatAstanaShortDate } from "@/lib/datetime";
+import { astanaDateInput, astanaDateInputDaysAgo, formatSourceShortDate } from "@/lib/datetime";
 import type { DashboardSummary, RiskTrendItem, RiskConcentrationItem } from "@/types/api";
 import KPICard from "@/components/KPICard";
 import LoadingState from "@/components/LoadingState";
@@ -142,7 +142,7 @@ export default function DashboardPage() {
   }, [fetchTrend]);
 
   const trendData = trend.map((item) => ({
-    date: formatAstanaShortDate(item.date),
+    date: formatSourceShortDate(item.date),
     highrisk: item.highrisk_ops,
     share: item.share,
     total: item.total_ops,

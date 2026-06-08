@@ -25,5 +25,18 @@ def format_astana_datetime(value: datetime | None, *, seconds: bool = False) -> 
     return astana_value.strftime("%d.%m.%Y %H:%M:%S" if seconds else "%d.%m.%Y %H:%M")
 
 
+def to_source_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    return value.replace(tzinfo=None)
+
+
+def format_source_datetime(value: datetime | None, *, seconds: bool = False) -> str:
+    source_value = to_source_datetime(value)
+    if source_value is None:
+        return "—"
+    return source_value.strftime("%d.%m.%Y %H:%M:%S" if seconds else "%d.%m.%Y %H:%M")
+
+
 def astana_filename_timestamp() -> str:
     return astana_now().strftime("%Y%m%d_%H%M")

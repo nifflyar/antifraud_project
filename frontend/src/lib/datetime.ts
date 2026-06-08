@@ -49,6 +49,68 @@ export function formatAstanaShortDate(value?: string | number | Date | null): st
   return `${pad(date.getUTCDate())}.${pad(date.getUTCMonth() + 1)}`;
 }
 
+type DateParts = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+};
+
+function sourceDateParts(value: string | number | Date): DateParts | null {
+  if (typeof value === "string") {
+    const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+    if (match) {
+      return {
+        year: Number(match[1]),
+        month: Number(match[2]),
+        day: Number(match[3]),
+        hour: Number(match[4] || 0),
+        minute: Number(match[5] || 0),
+        second: Number(match[6] || 0),
+      };
+    }
+  }
+
+  const date = parseDateLike(value);
+  if (!date) return null;
+  return {
+    year: date.getUTCFullYear(),
+    month: date.getUTCMonth() + 1,
+    day: date.getUTCDate(),
+    hour: date.getUTCHours(),
+    minute: date.getUTCMinutes(),
+    second: date.getUTCSeconds(),
+  };
+}
+
+export function formatSourceDate(value?: string | number | Date | null): string {
+  if (value === null || value === undefined || value === "") return "—";
+  const parts = sourceDateParts(value);
+  if (!parts) return "—";
+  return `${pad(parts.day)}.${pad(parts.month)}.${parts.year}`;
+}
+
+export function formatSourceShortDate(value?: string | number | Date | null): string {
+  if (value === null || value === undefined || value === "") return "—";
+  const parts = sourceDateParts(value);
+  if (!parts) return "—";
+  return `${pad(parts.day)}.${pad(parts.month)}`;
+}
+
+export function formatSourceDateTime(
+  value?: string | number | Date | null,
+  options: { seconds?: boolean } = {}
+): string {
+  if (value === null || value === undefined || value === "") return "—";
+  const parts = sourceDateParts(value);
+  if (!parts) return "—";
+  const time = `${pad(parts.hour)}:${pad(parts.minute)}`;
+  const withSeconds = options.seconds ? `${time}:${pad(parts.second)}` : time;
+  return `${pad(parts.day)}.${pad(parts.month)}.${parts.year} ${withSeconds}`;
+}
+
 export function formatAstanaDateTime(
   value?: string | number | Date | null,
   options: { seconds?: boolean; monthShort?: boolean; long?: boolean } = {}

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { operations } from "@/lib/api";
-import { astanaDateInput, formatAstanaDateTime } from "@/lib/datetime";
+import { astanaDateInput, formatSourceDateTime } from "@/lib/datetime";
 import type { SuspiciousOperation } from "@/types/api";
 import RiskBadge from "@/components/RiskBadge";
 import { ArrowLeftRight, ChevronLeft, ChevronRight, Filter, X, Search, Calendar, ArrowUpDown } from "lucide-react";
@@ -337,7 +337,7 @@ export default function OperationsPage() {
               ) : (
                 items.map((op) => (
                   <tr key={op.id}>
-                    <td style={{ whiteSpace: "nowrap", color: "var(--text-secondary)", fontSize: "0.8125rem" }}>{formatAstanaDateTime(op.op_datetime)}</td>
+                    <td style={{ whiteSpace: "nowrap", color: "var(--text-secondary)", fontSize: "0.8125rem" }}>{formatSourceDateTime(op.op_datetime)}</td>
                     <td className="mono" style={{ fontWeight: 800, color: op.operation_risk_score >= 85 ? "var(--risk-critical)" : op.operation_risk_score >= 65 ? "var(--risk-high)" : "var(--risk-medium)" }}>
                       {op.operation_risk_score}
                     </td>

@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { passengers } from "@/lib/api";
-import { formatAstanaDate } from "@/lib/datetime";
+import { formatSourceDate } from "@/lib/datetime";
 import type { PassengerListItem, RiskBand } from "@/types/api";
 import RiskBadge from "@/components/RiskBadge";
 import { Users, Search, ChevronLeft, ChevronRight, Eye, TrendingUp } from "lucide-react";
@@ -413,7 +413,7 @@ export default function PassengersPage() {
                       {(item.fake_fio_score * 100).toFixed(0)}%
                     </td>
                     <td style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>
-                      {formatAstanaDate(item.last_seen_at)}
+                      {formatSourceDate(item.last_seen_at)}
                     </td>
                     <td style={{ textAlign: "right" }}>
                       <button

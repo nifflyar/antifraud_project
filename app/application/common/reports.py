@@ -6,17 +6,18 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from app.application.common.timezone import to_astana_datetime
+from app.application.common.timezone import to_astana_datetime, to_source_datetime
 
 
 class ExcelReportGenerator:
     """Helper class to generate formatted Excel reports."""
 
-    def __init__(self, title: str):
+    def __init__(self, title: str, *, convert_datetimes_to_astana: bool = False):
         self.wb = Workbook()
         self.ws = self.wb.active
         self.ws.title = self._safe_sheet_title(title)
         self._header_row: int | None = None
+        self.convert_datetimes_to_astana = convert_datetimes_to_astana
         self._set_header_style()
 
     @staticmethod
@@ -43,7 +44,11 @@ class ExcelReportGenerator:
             for col_num, value in enumerate(row_data, 1):
                 cell_value = value
                 if isinstance(value, datetime):
-                    cell_value = to_astana_datetime(value, naive=True)
+                    cell_value = (
+                        to_astana_datetime(value, naive=True)
+                        if self.convert_datetimes_to_astana
+                        else to_source_datetime(value)
+                    )
 
                 cell = self.ws.cell(row=row_num, column=col_num, value=cell_value)
                 cell.alignment = self.align_left
